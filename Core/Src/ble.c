@@ -23,7 +23,8 @@ static bool ble_adcBufIsLocking;
 static u32 ble_spiSentnum;
 
 // buffer to adc sample datas transfered to RSL10 through SPI.
-static u8 adc_data_buf[2 * BUFFER_SIZE_1KB] = {0};
+//static u8 adc_data_buf[2 * BUFFER_SIZE_1KB] = {0};
+static u8 adc_data_buf[BUFFER_SIZE_512B] = {0};
 static size_t adc_data_buf_size = sizeof(adc_data_buf);
 static u8 *padc_data_start = &adc_data_buf[0];
 static u8 *padc_data_end = &adc_data_buf[0];
@@ -842,6 +843,8 @@ static void ble_dealReqCommand(void)
       break;
     // request FOTA(0x19)
     case ble_p_req_fota:
+      // store some important value into spi flash;
+      ee_storeKeyValue();
       ble_status = ble_reqFota_status;
       ble_respUserReqOkOrErr(reqid, true);
       break;
@@ -1006,6 +1009,7 @@ static void ble_dealReqCommand(void)
     case ble_p_rsl10IsFota:
       // store some important value into spi flash;
       ee_storeKeyValue();
+      ble_respUserReqOkOrErr(reqid, true);
       ble_status = ble_reqFota_status;
       break;
 /*

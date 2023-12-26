@@ -12,7 +12,7 @@
 /* macro define *****************************************************/
 
 // battery level update time(unit: ms)
-#define WPR_BATT_LEVEL_UPDATE_TICK      60000 // 60S
+#define WPR_BATT_LEVEL_UPDATE_TICK      TIMEOUT_20S //  60000 // 60S
 
 #define WPR_INVALID_VALUE               (-1)
 

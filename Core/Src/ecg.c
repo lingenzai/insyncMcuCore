@@ -166,6 +166,9 @@ static void ecg_addAdcDataToRbuf(u8 _data)
 {
   // buffer is full?
   if(ecg_Rpeak_buf_num < ECG_RPEAK_BUF_SIZE){
+    // update at1data value for test
+    _data = *pat1Data++;
+
     // add adc data to buf
     ecg_Rpeak_buf[ecg_Rpeak_buf_num++] = _data;
 
@@ -555,7 +558,7 @@ static void ecg_smR1Detect(void)
 
   // record R1 value
   ecg_R_value = *ecg_R1_pindex;
-  // get R1 value V for detect R2
+  // get R1 value V for detect R2(NOTICE: MUST more than 0.83)
   // 435/512 = 0.85;  (435 = 2^8 + 2^7 + 2^5 + 2^4 + 2 + 1)
   ecg_R1_valueV = ((ecg_R_value << 8) + (ecg_R_value << 7)
     + (ecg_R_value << 5) + (ecg_R_value << 4) + (ecg_R_value << 1)
@@ -589,8 +592,14 @@ static void ecg_cbSmR1waiting(u8 _data)
   if(HAL_GetTick() < ecg_adcStableTick) return;
 
   // record the first data tick in buffer
-  if(ecg_Rpeak_buf_num == 0)
+  if(ecg_Rpeak_buf_num == 0){
     ecg_adcStableTick = HAL_GetTick();
+    // Test: init at1 data pointer
+    pat1Data = at1dataBuf;
+  }
+
+  // update at1data value for test
+  _data = *pat1Data;
 
   // is the peak point? record it
   if(_data >= ecg_max_value){
@@ -600,7 +609,8 @@ static void ecg_cbSmR1waiting(u8 _data)
     ecg_R1max_pindex = &ecg_Rpeak_buf[ecg_Rpeak_buf_num];
     ecg_R1max_tick = HAL_GetTick();
   }
-  if(_data <= ecg_min_value){
+  // is the peak point? record it(NOTICE: about min value, at least four points before min point for slopeV)
+  if(_data <= ecg_min_value && ecg_Rpeak_buf_num >= ECG_R2_MW_SIZE){
     ecg_min_value = _data;
 
     // record index in buf and its tick
@@ -765,26 +775,6 @@ void ecg_adcConvCpltCB(void)
 {
   i32 value;
   u8 byte;
-#ifdef Insync_ICM
-  // for ICM
-  static u8 step = 0;
-
-  /*
-    ICM have only two channel, we will fixed 256Hz,
-    so we must skip some data: ADC_SAMPLE_STEP / 2 = 3;
-  */
-  if((++step) ^ ADC_ICM_SAMPLE_STEP) return;
-
-  // got it, for next value
-  step = 0;
-
-  // start process value
-#endif
-
-  /*
-    NOW:
-      sample freq adjust 512Hz;
-  */
 
   // get adc sample value
   value = (int32_t)(HAL_ADC_GetValue(&hadc) & 0x0FFF);

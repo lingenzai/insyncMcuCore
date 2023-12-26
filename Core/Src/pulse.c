@@ -234,7 +234,6 @@ static void pulse_smWaitingProc(void)
 
   /* NOW: we will check ecg pulsing flag every R peak piont */
 
-
   // ecg notify pulsing startup?
   if(pulse_ecgPulsingOn){
     // start up pulsing
