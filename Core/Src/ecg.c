@@ -582,8 +582,8 @@ static void ecg_smR1Detect(void)
   brief:
     1. Value of _data is [0, 255];
     2. If _data is adcMaxValue, his value is 255;
-    3. If _data is adcMinValue, hsi value is 0;
-    4. store data in buffer untill num is 625(2.5s);
+    3. If _data is adcMinValue, his value is 0;
+    4. store data in buffer untill num is 625(2.5 seconds);
 */
 static void ecg_cbSmR1waiting(u8 _data)
 {
