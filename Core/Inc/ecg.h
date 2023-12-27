@@ -40,20 +40,22 @@
 #endif
 
 // after R1 point, skip some byte for detecting R2
-// DONT add ()
-#define ECG_RR_TIME_PER_POINT       396 / 100   // 4ms
 // skip point num of 180 ms(180/4=45)
 #define ECG_R2_SKIP_POINT_NUM      (TIMEOUT_180MS * 3 / 2 / ADC_SAMPLE_STEP)
 // R2 detect window point size
-#define ECG_R2_MW_SIZE              4
-// In R2 detected state, step of each detect
-#ifdef LiuJH_DEBUG
-// RDET is OK
-#define ECG_R2_DETECT_STEP          1
-#else
-// IEGM is OK
-#define ECG_R2_DETECT_STEP          2
-#endif
+#define ECG_R2_MW_SIZE              6
+
+// define slope default value
+#define ECG_SLOPE_DEFAULT           40
+// slope step(get ONE slope per four points)
+#define ECG_SLOPE_STEP              3
+// we will get four slopes left R1 and right R1
+#define ECG_SLOPE_NUM               4
+// use 0.80 as slope weight
+#define ECG_SLOPE_WEIGHT            4 / 5
+// use 0.85 as R value weight
+#define ECG_R_VALUE_WEIGHT          17 / 20
+
 // Rn move window size
 #define ECG_Rn_MW_HALF_SIZE         4 // 2
 // 4 + 1 + 4, guess Rn peak point is in middle of these points

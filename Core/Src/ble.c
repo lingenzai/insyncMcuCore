@@ -843,10 +843,13 @@ static void ble_dealReqCommand(void)
       break;
     // request FOTA(0x19)
     case ble_p_req_fota:
+    // rsl10 told mcu: its status is FOTA with APP(0x61)
+    case ble_p_rsl10IsFota:
       // store some important value into spi flash;
       ee_storeKeyValue();
-      ble_status = ble_reqFota_status;
+      // told RSL10 OK
       ble_respUserReqOkOrErr(reqid, true);
+      ble_status = ble_reqFota_status;
       break;
     // read bpm(0x1A)
     case ble_p_read_bpm:
@@ -1005,13 +1008,6 @@ static void ble_dealReqCommand(void)
       // rsl10 is idle, continue query, status dont change
       break;
 */
-    // rsl10 told mcu: its status is FOTA with APP(0x61)
-    case ble_p_rsl10IsFota:
-      // store some important value into spi flash;
-      ee_storeKeyValue();
-      ble_respUserReqOkOrErr(reqid, true);
-      ble_status = ble_reqFota_status;
-      break;
 /*
     // rsl10 told mcu: its status is connected with APP(0x62)
     case ble_p_rsl10IsConnected:
@@ -1548,8 +1544,9 @@ void ble_stateMachine(void)
 
     case ble_reqFota_status:
       // keep working status, but do nothing, untill RSL10 reset mcu
+      break;
     default:
-    break;
+      break;
   }
 
   // trim adc peak value for R detection
