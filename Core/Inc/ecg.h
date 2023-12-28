@@ -24,6 +24,7 @@
 
 #define ECG_MAX_INIT_VALUE          0
 #define ECG_MIN_INIT_VALUE          (0xFF)
+#define ECG_MAX_BYTE_VALUE          (0xFF)
 
 // R wave slope coefficient
 // NOTE: dont add ()
