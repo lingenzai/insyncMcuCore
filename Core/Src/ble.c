@@ -714,12 +714,14 @@ static void ble_reqWritePulseConfig(u8 _reqId)
   pconfig->pulse_end_time = (*prx++) * 60;
   // minutes of end time
   pconfig->pulse_end_time += *prx++;
-  // delay time
-  pconfig->pulse_delay_ms = *prx++;
+  // Rv delay time
+  pconfig->pulse_Rv_delay_ms = *prx++;
   // pulse num
   pconfig->pulse_num = *prx++;
   // pulse width
   pconfig->pulse_width = *prx++;
+  // pulse Rsvi delay(unit: ms)
+  pconfig->pulse_Rsvi_ms = *prx++;
 
   // set data valid flag
   pconfig->pulse_configIsValid = MCU_DATA_STRUCT_VALID_VALUE;
@@ -763,9 +765,10 @@ static void ble_reqReadPulseConfig(u8 _reqId)
   *ptx++ = (u8)(pconfig->pulse_start_time % 60);
   *ptx++ = (u8)(pconfig->pulse_end_time / 60);
   *ptx++ = (u8)(pconfig->pulse_end_time % 60);
-  *ptx++ = (u8)(pconfig->pulse_delay_ms);
+  *ptx++ = (u8)(pconfig->pulse_Rv_delay_ms);
   *ptx++ = (u8)(pconfig->pulse_num);
   *ptx++ = (u8)(pconfig->pulse_width);
+  *ptx++ = (u8)(pconfig->pulse_Rsvi_ms);
   num = ptx - ble_spiTxBuf;
 
   // check xor

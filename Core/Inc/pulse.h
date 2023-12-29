@@ -15,7 +15,8 @@
 #define PULSING_BPM_CALM_MAX        125
 
 
-#define PULSE_DELAY_MS_DEFAULT      20
+#define PULSE_RSVI_DELAY_MS_DEFAULT 10
+#define PULSE_RV_DELAY_MS_DEFAULT   20
 #define PULSE_NUM_DEFAULT           2
 // unit is 0.1ms, so 5ms is: 50
 #define PULSE_WIDTH_DEFAULT         50
@@ -51,8 +52,10 @@ typedef struct{
   // config is valid flag
   u8 pulse_configIsValid;
 
+  // pulse Rsvi delay(unit: ms)
+  u8 pulse_Rsvi_ms;
   // pulse Rv delay(unit: ms)
-  u8 pulse_delay_ms;
+  u8 pulse_Rv_delay_ms;
   // pulse numbers
   u8 pulse_num;
   // pulse width(unit: 0.1ms), so width / 10 = count of ms

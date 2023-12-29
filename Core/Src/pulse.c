@@ -226,11 +226,15 @@ static void pulse_smWaitingProc(void)
 
   /* NOW: we can Detecting motion status and bpm */
 
-  // check motion
-  if(!accel_isMotionless()) return;
-
-  // check bpm
-  if(!pulse_isInnerPeace()) return;
+  if(ble_isWorking() && pulse_blePulsingOn){
+    // ignore checking both of accel and bpm
+  }else{
+    // check motion
+    if(!accel_isMotionless()) return;
+    
+    // check bpm
+    if(!pulse_isInnerPeace()) return;
+  }
 
   /* NOW: we will check ecg pulsing flag every R peak piont */
 
@@ -238,7 +242,7 @@ static void pulse_smWaitingProc(void)
   if(pulse_ecgPulsingOn){
     // start up pulsing
     ovbc_startup();
-  
+
     // update status
     pulse_status = pulse_pulsing_status;
   }
@@ -416,11 +420,12 @@ void pulse_calibrateUnpulsingPeriod(void)
   brief:
     1. check valid or not;
     2. if unvalid, set default config value:
-        pulse_delay_ms:   20;
-        pulse_num:        2
-        pulse_width:      5
-        pulse_start_time: 00:30
-        pulse_end_time:   03:30
+        pulse_Rsvi_ms:      10
+        pulse_Rv_delay_ms:  20;
+        pulse_num:          2
+        pulse_width:        5
+        pulse_start_time:   00:30
+        pulse_end_time:     03:30
 */
 void pulse_calibrateConfig(void)
 {
@@ -428,7 +433,8 @@ void pulse_calibrateConfig(void)
 
   // unvalid?
   if(p->pulse_configIsValid ^ MCU_DATA_STRUCT_VALID_VALUE){
-    p->pulse_delay_ms = PULSE_DELAY_MS_DEFAULT;
+    p->pulse_Rsvi_ms = PULSE_RSVI_DELAY_MS_DEFAULT;
+    p->pulse_Rv_delay_ms = PULSE_RV_DELAY_MS_DEFAULT;
     p->pulse_num = PULSE_NUM_DEFAULT;
     p->pulse_width = PULSE_WIDTH_DEFAULT;
     p->pulse_start_time = PULSE_START_TIME_DEFAULT;
