@@ -19,8 +19,6 @@
 // test used
 #define LiuJH_DEBUG
 
-// test for pulse
-//#define LiuJH_PULSE
 
 // ICM and CCM
 #ifndef LiuJH_DEBUG

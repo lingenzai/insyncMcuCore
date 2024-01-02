@@ -23,7 +23,8 @@ static bool ble_adcBufIsLocking;
 static u32 ble_spiSentnum;
 
 // buffer to adc sample datas transfered to RSL10 through SPI.
-static u8 adc_data_buf[2 * BUFFER_SIZE_1KB] = {0};
+//static u8 adc_data_buf[2 * BUFFER_SIZE_1KB] = {0};
+static u8 adc_data_buf[BUFFER_SIZE_512B] = {0};
 static size_t adc_data_buf_size = sizeof(adc_data_buf);
 static u8 *padc_data_start = &adc_data_buf[0];
 static u8 *padc_data_end = &adc_data_buf[0];
@@ -713,12 +714,14 @@ static void ble_reqWritePulseConfig(u8 _reqId)
   pconfig->pulse_end_time = (*prx++) * 60;
   // minutes of end time
   pconfig->pulse_end_time += *prx++;
-  // delay time
-  pconfig->pulse_delay_ms = *prx++;
+  // Rv delay time
+  pconfig->pulse_Rv_delay_ms = *prx++;
   // pulse num
   pconfig->pulse_num = *prx++;
   // pulse width
   pconfig->pulse_width = *prx++;
+  // pulse Rsvi delay(unit: ms)
+  pconfig->pulse_Rsvi_ms = *prx++;
 
   // set data valid flag
   pconfig->pulse_configIsValid = MCU_DATA_STRUCT_VALID_VALUE;
@@ -762,9 +765,10 @@ static void ble_reqReadPulseConfig(u8 _reqId)
   *ptx++ = (u8)(pconfig->pulse_start_time % 60);
   *ptx++ = (u8)(pconfig->pulse_end_time / 60);
   *ptx++ = (u8)(pconfig->pulse_end_time % 60);
-  *ptx++ = (u8)(pconfig->pulse_delay_ms);
+  *ptx++ = (u8)(pconfig->pulse_Rv_delay_ms);
   *ptx++ = (u8)(pconfig->pulse_num);
   *ptx++ = (u8)(pconfig->pulse_width);
+  *ptx++ = (u8)(pconfig->pulse_Rsvi_ms);
   num = ptx - ble_spiTxBuf;
 
   // check xor
@@ -842,8 +846,13 @@ static void ble_dealReqCommand(void)
       break;
     // request FOTA(0x19)
     case ble_p_req_fota:
-      ble_status = ble_reqFota_status;
+    // rsl10 told mcu: its status is FOTA with APP(0x61)
+    case ble_p_rsl10IsFota:
+      // store some important value into spi flash;
+      ee_storeKeyValue();
+      // told RSL10 OK
       ble_respUserReqOkOrErr(reqid, true);
+      ble_status = ble_reqFota_status;
       break;
     // read bpm(0x1A)
     case ble_p_read_bpm:
@@ -1002,12 +1011,6 @@ static void ble_dealReqCommand(void)
       // rsl10 is idle, continue query, status dont change
       break;
 */
-    // rsl10 told mcu: its status is FOTA with APP(0x61)
-    case ble_p_rsl10IsFota:
-      // store some important value into spi flash;
-      ee_storeKeyValue();
-      ble_status = ble_reqFota_status;
-      break;
 /*
     // rsl10 told mcu: its status is connected with APP(0x62)
     case ble_p_rsl10IsConnected:
@@ -1544,8 +1547,9 @@ void ble_stateMachine(void)
 
     case ble_reqFota_status:
       // keep working status, but do nothing, untill RSL10 reset mcu
+      break;
     default:
-    break;
+      break;
   }
 
   // trim adc peak value for R detection

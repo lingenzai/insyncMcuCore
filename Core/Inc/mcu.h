@@ -52,6 +52,7 @@
 
 #define BUFFER_SIZE_1KB         1024
 #define BUFFER_SIZE_512B        512
+#define BUFFER_SIZE_256B        256
 
 // ask RSL10 enter LPM times
 #define ASK_RSL10_LPM_NUM           3

@@ -14,16 +14,18 @@
   1. Sample time per point is (12.5 + 160.5) * 1000 / (16 * 2^20 / 64),
       It is 173 * 125 / 32768 = 0.6599 ms;
   2. If step is 6(ADC_SAMPLE_STEP), the time per point is 0.6599 * 6 = 4 ms;
-  3. If sample time is 2.5s, the total point is: 2.5 * 1000 / 4 = 625;
-  4. If use not loop buffer, we must have two R peak point in buffer,
-    so, 625 + 625 = 1250;
+  3. if bpm is 30(this is imposible min value), 60 * 1000 / 30 / 4 = 500 bytes;
+  3. so we can get one R value in 512 bytes;
+  4. If use not loop buffer, we must have two R(R1 and R2) peak point in buffer,
+    so, 500 + 500 = 1000;
 */
-#define ECG_RPEAK_BUF_NEED_NUM      625
-#define ECG_BUF_ATTACH_NUM          625
-#define ECG_RPEAK_BUF_SIZE          ECG_RPEAK_BUF_NEED_NUM + ECG_BUF_ATTACH_NUM // 1250
+#define ECG_BUF_R1_NEED_NUM         500
+#define ECG_BUF_R2_NEED_NUM         ECG_BUF_R1_NEED_NUM
+// for quickly, we get the result
+#define ECG_BUF_SIZE                1000  // ECG_BUF_R1_NEED_NUM + ECG_BUF_R2_NEED_NUM // 1000
 
-#define ECG_MAX_INIT_VALUE          0
-#define ECG_MIN_INIT_VALUE          (0xFF)
+#define ECG_MAX_BYTE_VALUE          (0xFF)
+#define ECG_MIN_BYTE_VALUE          0
 
 // R wave slope coefficient
 // NOTE: dont add ()
@@ -40,20 +42,22 @@
 #endif
 
 // after R1 point, skip some byte for detecting R2
-// DONT add ()
-#define ECG_RR_TIME_PER_POINT       396 / 100   // 4ms
 // skip point num of 180 ms(180/4=45)
 #define ECG_R2_SKIP_POINT_NUM      (TIMEOUT_180MS * 3 / 2 / ADC_SAMPLE_STEP)
 // R2 detect window point size
-#define ECG_R2_MW_SIZE              4
-// In R2 detected state, step of each detect
-#ifdef LiuJH_DEBUG
-// RDET is OK
-#define ECG_R2_DETECT_STEP          1
-#else
-// IEGM is OK
-#define ECG_R2_DETECT_STEP          2
-#endif
+#define ECG_R2_MW_SIZE              6
+
+// define slope default value
+#define ECG_SLOPE_DEFAULT           40
+// slope step(get ONE slope per four points)
+#define ECG_SLOPE_STEP              3
+// we will get four slopes left R1 and right R1
+#define ECG_SLOPE_NUM               4
+// use 0.80 as slope weight
+#define ECG_SLOPE_WEIGHT            4 / 5
+// use 0.85 as R value weight
+#define ECG_R_VALUE_WEIGHT          17 / 20
+
 // Rn move window size
 #define ECG_Rn_MW_HALF_SIZE         4 // 2
 // 4 + 1 + 4, guess Rn peak point is in middle of these points
@@ -63,6 +67,8 @@
 
 // continue get Rn numbers we can pulsing
 #define ECG_RN_DETECTED_MIN_NUM     5
+
+#define ECG_ESCAPED_MAX_NUM         2
 
 
 
@@ -93,11 +99,6 @@ typedef enum{
     2. go into next status;
   */
   ecg_startup_status,
-  /*
-    1. init all vars except vars about Rv;
-    2. others work is same of startup status;
-  */
-  ecg_startup2_status,
   /*
     1. adc sample start, and record adc data;
     2. until 2.5 s, make sure include one R peak point;
@@ -161,8 +162,8 @@ typedef enum{
 extern void ecg_init(void);
 extern void ecg_stateMachine(void);
 extern void ecg_startup(void);
-extern void ecg_adcConvCpltCB(void);
-extern u8 ecg_getAdcChNum(void);
+extern void ecg_adcConvCpltCB(u8 _curCh);
+extern bool ecg_isEcgAdcCh(u8 _curCh);
 extern u8 ecg_getBpm(void);
 extern u32 ecg_getRnTick(void);
 extern bool ecg_getRsviAbout(u8 *_pdata);

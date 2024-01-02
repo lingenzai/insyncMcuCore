@@ -25,7 +25,6 @@
 #define ee_addr_pulseConfig_end       (ee_addr_pulseConfig + ee_addr_pulseConfig_size - 1)
 
 // unpulsing period address in EEPROM
-//#define ee_addr_unpulsingPeriod     (ee_addr_pulseConfig_end + 4) & (-4)  // 0xFFFFFFFC
 #define ee_addr_unpulsingPeriod       (ee_addr_pulseConfig_end + 1)
 #define ee_addr_unpulsingPeriod_size  (sizeof(pulse_unpulsing_period_typeDef))
 #define ee_addr_unpulsingPerod_end    (ee_addr_unpulsingPeriod + ee_addr_unpulsingPeriod_size - 1)

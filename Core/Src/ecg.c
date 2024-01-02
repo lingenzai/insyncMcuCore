@@ -13,56 +13,43 @@ static ecg_Status_typeDef ecg_status;
 static bool ecgIsWorking;
 
 // ADC sample data buffer for detecting R peak point
-static uint8_t ecg_Rpeak_buf[ECG_RPEAK_BUF_SIZE];
+static u8 ecg_RsBuf[ECG_BUF_SIZE], ecg_RvBuf[ECG_BUF_SIZE];
 // ADC sample data num in Rpeak_buffer
-static u32 ecg_Rpeak_buf_num;
-// record max and min value in half of ecg buffer
-static u8 ecg_max_value, ecg_min_value;
-// Index of R1 peak point, max point and min point in RpeakBuf of 2.5 second
-static u8 *ecg_R1_pindex, *ecg_R1max_pindex, *ecg_R1min_pindex;
-// record R, max and min point tick
-static u32 ecg_R_tick, ecg_R1max_tick, ecg_R1min_tick;
+static u32 ecg_RsBufNum, ecg_RvBufNum;
+// record the first byte tick in buffer
+static u32 ecg_RsBufFirstTick, ecg_RvBufFirstTick;
 // record the last byte tick in buffer
-static u32 ecg_bufLastDataTick;
-// record R wave is upward or downward
-static bool ecg_R_isUpward;
+static u32 ecg_RsBufLastTick, ecg_RvBufLastTick;
+
+// offset of R1 peak point, max value point in RpeakBuf of 2 second
+static u32 ecg_Rs1Off, ecg_Rv1Off;
+// record R, max point tick
+static u32 ecg_RsTick, ecg_RvTick;
+// record av of R1 and R peak point value
+static u16 ecg_RsValue, ecg_RsValueV;
+static u16 ecg_RvValue, ecg_RvValueV;
 /// record R wave average of slope
-static int32_t ecg_R_slopeV;
-// rercord detected point num from R1 to R2
-static u32 ecg_R_detected;
+static int32_t ecg_RsSlopeV, ecg_RvSlopeV;
+// rercord detected point num from R1 to R2, and Rn
+static u32 ecg_RsDetected, ecg_RvDetected;
 
-
-/*
-  record detected byte number from R1 point for R2 peak point.
-  this num is a time line(4ms per point).
-*/
 // RR interval point number
-static u32 ecg_RR_interval;
+static u32 ecg_RRsiPoint, ecg_RRviPoint;
 // RR interval time(point num * sample time per point ECG_RR_TIME_PER_POINT)
-static u32 ecg_RRi_ms;
+static u32 ecg_RRsiTime, ecg_RRviTime;
 // adc data time per point(us)
-static u32 ecg_PPi_us;
-static u32 ecg_bpm;
-// record av of R1 and R2 peak point value
-static u8 ecg_R_value;
-static u8 ecg_R1_valueV;
-// record num of Rn detected
-static u32 ecg_Rn_detected;
-// record num of Rn escaped
-static u32 ecg_Rn_escaped;
-static u32 ecg_Rn_continue_escaped;
+static u32 ecg_RsPPiTime, ecg_RvPPiTime;
+static u32 ecg_RsBpm, ecg_RvBpm;
 
-#ifdef Insync_CCM
-static u32 ecg_Rv_bpm;
-static u32 ecg_Rv_R1_tick;
-static u32 ecg_Rv_RRi_ms;
-// record Rs and Rv interval(unit: ms)
+// record interval(unit: ms) between Rs and Rv
 // this value will store in EE before LPM
-static u32 ecg_Rs_Rv_interval_ms;
-#endif
+static u32 ecg_RsviTime;
 
-// record ecg selected adc channel num
-static u8 ecg_adcChNum;
+// record num of Rn detected
+static u32 ecg_RnDetected;
+// record num of Rn continue escaped num and All num
+static u32 ecg_RnEscaped, ecg_RnEscapedAll;
+
 // adc max/min value pair
 static int32_t ecg_adcMaxValue, ecg_adcMinValue;
 // adc peak value in 2.5s
@@ -72,6 +59,8 @@ static u32 ecg_adcTrimPeakTick;
 // trim RDET adc sample some times at first
 // and then it is flag of the first data tick in buffer
 static u32 ecg_adcStableTick;
+// record process finished
+static bool ecg_RsOk, ecg_RvOk;
 
 
 /* private fuction define *****************************************/
@@ -79,19 +68,24 @@ static u32 ecg_adcStableTick;
 
 /*
   brief:
-    1. We got Rv values at first, and then got Rs values;
-    2. So: R tick of Rv > R tick of Rs;
-    3. RRi_msV = (Rs_RRi_ms + Rv_RRi_ms) / 2;
-    4. Rsvi_ms = RRi_msV - (Rs_tick - Rv_tick) % RRi_msV;
+    1. unit is ms;
 */
-static void ecg_calculateRsRvInterval(void)
+static void ecg_calculateRsvi(void)
 {
-  u32 RRi_msV = ecg_RRi_ms;
+  u32 RRi_ms1, RRi_ms2;
 
-  if(ecg_RRi_ms != ecg_Rv_RRi_ms)
-    RRi_msV = (ecg_RRi_ms + ecg_Rv_RRi_ms) >> 1;
+  if(ecg_RsTick > ecg_RvTick){
+    // we must move Rv peak point
+    RRi_ms1 = (ecg_RsTick - ecg_RvTick) % ecg_RRviTime;
+    RRi_ms2 = ecg_RRviTime - RRi_ms1; // is correct
+  }else{
+    // we must move Rs peak point
+    RRi_ms1 = (ecg_RvTick - ecg_RsTick) % ecg_RRsiTime; // is correct
+    RRi_ms2 = ecg_RRsiTime - RRi_ms1;
+  }
 
-  ecg_Rs_Rv_interval_ms = RRi_msV - (ecg_R_tick - ecg_Rv_R1_tick) % RRi_msV;
+  // record min value
+  ecg_RsviTime = (RRi_ms1 < RRi_ms2) ? (RRi_ms1) : (RRi_ms2);
 }
 
 /*
@@ -162,40 +156,126 @@ static void ecg_recordPeakValue(i32 _adcValue)
     1. Add adc byte current tick into buf at R1waint status;
     2. 
 */
-static void ecg_addAdcDataToRbuf(u8 _data)
+static void ecg_addAdcDataToRbuf(u8 _curCh, u8 _data)
 {
+  bool isRsCh = _curCh ^ ADC_CH_NUM_RV_RDET;
+  u8 *pbuf;
+  u32 *pnum;
+  u32 *pftick, *pltick;
+
+  // Is Rs channel data?
+  if(isRsCh){
+    pbuf = ecg_RsBuf;
+    pnum = &ecg_RsBufNum;
+    pftick = &ecg_RsBufFirstTick;
+    pltick = &ecg_RsBufLastTick;
+  }else{  // is Rv channel data
+    pbuf = ecg_RvBuf;
+    pnum = &ecg_RvBufNum;
+    pftick = &ecg_RvBufFirstTick;
+    pltick = &ecg_RvBufLastTick;
+  }
+
   // buffer is full?
-  if(ecg_Rpeak_buf_num < ECG_RPEAK_BUF_SIZE){
+  if(*pnum < ECG_BUF_SIZE){
+    // It is the first data? record the tick
+    if(*pnum == 0)
+      *pftick = HAL_GetTick();
+
     // add adc data to buf
-    ecg_Rpeak_buf[ecg_Rpeak_buf_num++] = _data;
+    pbuf[*pnum] = _data;
+    *pnum += 1;
 
     // collected the last byte?
-    if(ecg_Rpeak_buf_num == ECG_RPEAK_BUF_SIZE){
+    if(*pnum == ECG_BUF_SIZE){
       // store current tick(buf last data tick)
-      ecg_bufLastDataTick = HAL_GetTick();
+      *pltick = HAL_GetTick();
     }
   }
 }
 
 /*
   brief:
-    1. We only caculate four points right arg, because some points
-      is 255 at left of peak point;
-    2. We have enough bytes for this;
-    3. NOTE: if ECG R wave is downward, return value is negative;
+    1. the param data list is: Pl6 Pl5 Pl4 Pl3 Pl2 Pl1 P0 Pr1 Pr2 Pr3 Pr4 Pr5 Pr6;
+    2. Because P0 is the max value point so...
+    3. We will get eight slope:
+        Sl3 = (Pl3 - Pl6) / 3; Sl2 = (Pl2 - Pl5) / 3; Sl1 = (Pl1 - Pl4) / 3; Sl0 = (Pl0 - Pl3) / 3;
+        Sr3 = (Pr3 - Pr6) / 3; Sr2 = (Pr2 - Pr5) / 3; Sr1 = (Pr1 - Pr4) / 3; Sr0 = (Pr0 - Pr3) / 3;
+    4. will return the max value of these eight slope;
 */
-static int32_t ecg_getPeakPointSlope(u8 *_pbufindex)
+static int32_t ecg_calculateSlope(u8 *_pbufindex)
 {
-  int32_t s = 0;
-  u8 *p1, *p2;
+  int32 ret = 0;
+  int32 buf[8];
+  int32 *p = buf;
+  // pointer big value point
+  u8 *p0 = _pbufindex - ECG_SLOPE_STEP;
+  // pointer small value point
+  u8 *p3 = p0 - ECG_SLOPE_STEP;
+  int i;
 
-  if(_pbufindex){
-    p1 = _pbufindex + 1;
-    p2 = _pbufindex + ECG_R2_MW_SIZE;
-    s = (*p1 - *p2) / (ECG_R2_MW_SIZE - 1);
+  // calculate four slopes at left R point, and sotre in buf
+  for(i = 0; i < ECG_SLOPE_NUM; i++){
+    *p++ = ((*p0++) - (*p3++)) / 3;
   }
 
-  return s;
+  // calculate four slopes at right R point, and sotre in buf
+  /*
+    NOW:
+      1. p0 pointer R point;
+      2. update p3, will pointer the right of R point;
+  */
+  p0 = _pbufindex;
+  p3 = p0 + ECG_SLOPE_STEP;
+  // calculate four slopes at right R point, and sotre in buf
+  for(i = 0; i < ECG_SLOPE_NUM; i++){
+    *p++ = ((*p0++) - (*p3++)) / 3;
+  }
+
+  // adjust all value to Absolute value
+  for(i = 0; i < 8; i++){
+    if(buf[i] < 0){
+      buf[i] = -buf[i];
+    }
+  }
+
+  // get the max slope of these eight values, and return it
+  for(i = 0; i < 8; i++){
+    if(buf[i] > ret){
+      ret = buf[i];
+    }
+  }
+
+  return ret;
+}
+
+static void ecg_init2(void)
+{
+  // init R peak point buf
+  ecg_RsBufNum = ecg_RvBufNum = 0;
+  ecg_RsBufFirstTick = ecg_RvBufFirstTick = 0;
+  ecg_RsBufLastTick = ecg_RvBufLastTick = 0;
+
+  // init var about R1 and R2
+  ecg_Rs1Off = ecg_Rv1Off = 0;
+  ecg_RsTick = ecg_RvTick = 0;
+  ecg_RsValue = ecg_RvValue = 0;
+  ecg_RsValueV = ecg_RvValueV = 0;
+  ecg_RsSlopeV = ecg_RvSlopeV = 0;
+  ecg_RsDetected = ecg_RvDetected = 0;
+  ecg_RRsiPoint = ecg_RRviPoint = 0;
+  ecg_RRsiTime = ecg_RRviTime = 0;
+  ecg_RsPPiTime = ecg_RvPPiTime = 0;
+  ecg_RsOk = ecg_RvOk = false;
+
+  // init param for APP
+  ecg_RsBpm = ecg_RvBpm = 0;
+  ecg_RsviTime = 0;
+
+  // init var for Rn
+  ecg_RnDetected = 0;
+  ecg_RnEscaped = 0;
+  ecg_RnEscapedAll = 0;
 }
 
 /*
@@ -213,43 +293,42 @@ static void ecg_cbSmRnDetect(u8 _data)
 
 #ifdef LiuJH_DEBUG
   // For testing Rn detected ERROR
-  if(ecg_Rpeak_buf_num >= ECG_RPEAK_BUF_SIZE)
-    ecg_Rpeak_buf_num = 0;
-  ecg_addAdcDataToRbuf(_data);
+  if(ecg_RsBufNum >= ECG_BUF_SIZE)
+    ecg_RsBufNum = 0;
+  ecg_addAdcDataToRbuf(ADC_CH_NUM_RS_RDET, _data);
 #endif
 
   // define R move window size for detecting R peak point
-  detectmin = ecg_RR_interval - ECG_Rn_MW_HALF_SIZE;
-  detectmax = ecg_RR_interval + ECG_Rn_MW_HALF_SIZE;
+  detectmin = ecg_RRsiPoint - ECG_Rn_MW_HALF_SIZE;
+  detectmax = ecg_RRsiPoint + ECG_Rn_MW_HALF_SIZE;
 
   // have enough data? need detecting?
-  if(ecg_R_detected <= detectmin){
+  if(ecg_RsDetected <= detectmin){
     // The first point of Rn move window, rocord it, dont need detect
     prevdata = _data;
     tick = HAL_GetTick();
 
     // dont need checking, skip it
-    ecg_R_detected++;
+    ecg_RsDetected++;
 
     return;
   }
 
   // escape? continue next R peak point detect
-  if(ecg_R_detected > detectmax){
+  if(ecg_RsDetected > detectmax){
     // record Rn detected and escaped num
-    ecg_Rn_detected++;
-    ecg_Rn_escaped++;
-    ecg_Rn_continue_escaped++;
+    ecg_RnDetected++;
+    ecg_RnEscaped++;
+    ecg_RnEscapedAll++;
 
     // twice continue escaped? restart R1 waiting...
-    if(ecg_Rn_continue_escaped >= 2){
+    if(ecg_RnEscaped >= ECG_ESCAPED_MAX_NUM){
       // redo R detect, restart up ecg detection
       ecg_status = ecg_startup_status;
     }else{
       // temp work, continue detecting next Rn peak point
-      ecg_R_detected = ECG_Rn_MW_HALF_SIZE;
+      ecg_RsDetected = ECG_Rn_MW_HALF_SIZE;
     }
-
     return;
   }
 
@@ -260,52 +339,45 @@ static void ecg_cbSmRnDetect(u8 _data)
       3. if exist inflection, the prev data is Rn peak point;
   */
 
-  // check the inflection
-  if((ecg_R_isUpward && _data < prevdata)
-    || (!ecg_R_isUpward && _data > prevdata)){
-    /*
-      The inflection is apear, _data is the first point at inflection edge
-    */
-    // prevdata is the Rn peak point???
-    // use 80% of R value check it
-    if(prevdata >= (ecg_R_value << 2) / 5){
-      // update R value
-      ecg_R_value = (ecg_R_value + prevdata) >> 1;
-      // record detected num
-      ecg_Rn_detected++;
-      ecg_Rn_continue_escaped = 0;
-      // record current R peak point tick value
-      ecg_R_tick = tick;
+  // check the inflection and the point value
+  if(_data < prevdata && prevdata > ecg_RsValueV){
+    // update R value and R value V
+    ecg_RsValue = (ecg_RsValue + prevdata) >> 1;
+    ecg_RsValueV = ecg_RsValue * ECG_R_VALUE_WEIGHT;
+    // record current R peak point tick value for pulse
+    ecg_RsTick = tick;
 
-      // Need trim current RRi or NOT???
-      if(ecg_RR_interval != ecg_R_detected){
-        ecg_RR_interval += ecg_R_detected;
-        ecg_RR_interval >>= 1;
-      }
+    // record detected num
+    ecg_RnDetected++;
+    // clear escaped continued
+    ecg_RnEscaped = 0;
 
-      // for detecting next Rn+1 peak point(prevdata is Rn peak point)
-      ecg_R_detected = 0;
-
-      // toast ble this tick of R peak point detected
-      ble_setPulseShowFlag();
-
-#ifdef LiuJH_DEBUG
-      if(ecg_Rn_detected >= ECG_RN_DETECTED_MIN_NUM
-        && ecg_Rn_continue_escaped == 0)
-        // trigger pulse sending
-        pulse_setPulsingFlag();
-
-#endif
+    // Need trim current RRi or NOT???
+    if(ecg_RRsiPoint != ecg_RsDetected){
+      ecg_RRsiPoint += ecg_RsDetected;
+      ecg_RRsiPoint >>= 1;
     }
-  }
-  else{
+
+    // for detecting next Rn+1 peak point(prevdata is Rn peak point)
+    ecg_RsDetected = 0;
+
+#ifndef LiuJH_DEBUG
+    // toast ble this tick of R peak point detected
+    ble_setPulseShowFlag();
+#endif
+
+    // trigger pulse sending
+    if(ecg_RnDetected >= ECG_RN_DETECTED_MIN_NUM)
+      pulse_setPulsingFlag();
+
+  }  else{
     // update prev data for next compare
     prevdata = _data;
     tick = HAL_GetTick();
   }
 
   // count for next R peak point detecting
-  ecg_R_detected++;
+  ecg_RsDetected++;
 }
 
 /*
@@ -318,48 +390,37 @@ static void ecg_cbSmRnDetect(u8 _data)
 */
 static void ecg_smRnWaiting2(void)
 {
-  u32 tick = HAL_GetTick();
+  u32 tick;
 
-  // get RRi_ms and ecg_bpm
-  ecg_RRi_ms = ecg_RR_interval * ecg_PPi_us / 1000;
-  ecg_bpm = 60 * 1000 / ecg_RRi_ms;
+  // get RRi_ms and ecg_bpm for Rs
+  ecg_RRsiTime = ecg_RRsiPoint * ecg_RsPPiTime / 1000;
+  ecg_RsBpm = 60 * 1000 / ecg_RRsiTime;
 
-  // for CCM
-  if(ecg_adcChNum == ADC_CH_NUM_RV_RDET){
-    // record R1_tick and RRi_ms of Rv
-    ecg_Rv_R1_tick = ecg_R_tick;
-    ecg_Rv_RRi_ms = ecg_RRi_ms;
-    ecg_Rv_bpm = ecg_bpm;
+  // get RRi_ms and ecg_bpm for Rv
+  ecg_RRviTime = ecg_RRviPoint * ecg_RvPPiTime / 1000;
+  ecg_RvBpm = 60 * 1000 / ecg_RRviTime;
 
-    // restart up ecg seletct channel of ADC_CH_NUM_RS_RDET
-    ecg_adcChNum = ADC_CH_NUM_RS_RDET;
-    ecg_status = ecg_startup2_status;
+  // check bpm is qual
+  if(ecg_RsBpm != ecg_RvBpm){
+    // restart detect both of Rs and Rv channel
+    ecg_status = ecg_startup_status;
 
     return;
-  }else if(ecg_adcChNum == ADC_CH_NUM_RS_RDET){
-    // check bpm is qual
-    if(ecg_bpm != ecg_Rv_bpm){
-      // restart detect R1, R2 of Rv RDET channel
-      ecg_adcChNum = ADC_CH_NUM_RV_RDET;
-      ecg_status = ecg_startup_status;
-
-      return;
-    }
   }
 
-
   /* NOW: we can calculate Rs_Rv delay time(unit: ms) */
-  ecg_calculateRsRvInterval();
+  ecg_calculateRsvi();
 
   /*
     NOW:
       1. we get RR_internal, RRi_ms and ecg_bpm;
       2. Base current tick, we can know next R peak point appear time;
+      3. we only detect Rs-RDET;
   */
   // Base R1 tick and current tick, calculate R_detected value for next Rn peak point
-  tick = HAL_GetTick() - ecg_R_tick;
-  tick %= ecg_RRi_ms;
-  ecg_R_detected = tick * 1000 / ecg_PPi_us;
+  tick = HAL_GetTick() - ecg_RsTick;
+  tick %= ecg_RRsiTime;
+  ecg_RsDetected = tick * 1000 / ecg_RsPPiTime;
 
 #ifdef LiuJH_DEBUG
   /*
@@ -368,10 +429,10 @@ static void ecg_smRnWaiting2(void)
       2. if full, num set 0, and loop record data in buffer continue;
       3. for each Rn detected, check where is ERROR;
   */
-  ecg_Rpeak_buf_num = 0;
+  ecg_RsBufNum = 0;
 #endif
   // detected Rn num and escaped Rn num init
-  ecg_Rn_detected = ecg_Rn_escaped = ecg_Rn_continue_escaped = 0;
+  ecg_RnDetected = ecg_RnEscaped = 0;
 
   // start detecting Rn using R move window, so go into next status
   ecg_status = ecg_RnDetect_status;
@@ -385,33 +446,45 @@ static void ecg_smRnWaiting2(void)
       fresh Rn peak point for deal it;
     3. Got PPi_us, RRi_ms, bpm KeyValues;
 */
-static void ecg_cbSmRnWaiting(u8 _data)
+static void ecg_cbSmRnWaiting(u8 _curCh, u8 _data)
 {
+  bool isRsCh = _curCh ^ ADC_CH_NUM_RV_RDET;
   // current point tick
-  u32 tick = HAL_GetTick();
-  // points num in buffer
-  u32 pointnum = ecg_Rpeak_buf_num + 1;
+  u32 tick;
 
   // add current data into buf
-  ecg_addAdcDataToRbuf(_data);
+  ecg_addAdcDataToRbuf(_curCh, _data);
 
-  // calculate RRi_ms
-  // if some data escape buffer
-  if(ecg_Rpeak_buf_num >= ECG_RPEAK_BUF_SIZE){
-    // Rpeak_buf is full, the last byte tick record
-    tick = ecg_bufLastDataTick;
-    // record point num in buffer
-    pointnum = ECG_RPEAK_BUF_SIZE;
+  /* calculate time(Unit: us) per point */
+  if(isRsCh && !ecg_RsOk){
+    // if some data escape buffer
+    if(ecg_RsBufNum >= ECG_BUF_SIZE){
+      tick = ecg_RsBufLastTick - ecg_RsBufFirstTick;
+    }else{
+      tick = HAL_GetTick() - ecg_RsBufFirstTick;
+    }
+
+    // calculate time(Unit: us) per point
+    ecg_RsPPiTime = tick * 1000 / (ecg_RsBufNum - 1);
+    ecg_RsOk = true;
+  }else if(!isRsCh && !ecg_RvOk){
+    // if some data escape buffer
+    if(ecg_RvBufNum >= ECG_BUF_SIZE){
+      tick = ecg_RvBufLastTick - ecg_RvBufFirstTick;
+    }else{
+      tick = HAL_GetTick() - ecg_RvBufFirstTick;
+    }
+
+    // calculate time(Unit: us) per point
+    ecg_RvPPiTime = tick * 1000 / (ecg_RvBufNum - 1);
+    ecg_RvOk = true;
   }
 
-  // get tick interval of all points
-  tick -= ecg_adcStableTick;
-
-  // calculate time(Unit: us) per point
-  ecg_PPi_us = tick * 1000 / pointnum;
-
   // goto next status
-  ecg_status = ecg_Rnwaiting2_status;
+  if(ecg_RsOk && ecg_RvOk){
+    ecg_status = ecg_Rnwaiting2_status;
+    ecg_RsOk = ecg_RvOk = false;
+  }
 }
 
 /*
@@ -419,7 +492,6 @@ static void ecg_cbSmRnWaiting(u8 _data)
     1. NOW: we have five important value:
         index of R1 peak pint;
         ecg_R1Tick;
-        EcgIsForward;
         ecg_R_slopeV;
     2. calculate slope of four bytes(before R2 peak point);
     3. if greate or equal ecg_R1slope_V, the R2 will appear;
@@ -427,231 +499,232 @@ static void ecg_cbSmRnWaiting(u8 _data)
 */
 static void ecg_smR2Detect(void)
 {
-  u8 *p = ecg_Rpeak_buf + ecg_R_detected;
+  bool *pOk;
+  // pointer current point(will check this point)
+  u8 *p;
+  // pointer next point for comparing with *p
+  u8 *pn;
+  u32 *pdetected = NULL, *poff, *pRRi;
+  u16 *pvalue, *pvalueV;
+  int32 *pslopeV;
   int32_t slope;
-  bool isfixedR2 = false;
 
-  /*
-    1. calculate slope per ECG_R2_MW_SIZE points, detecte R2, step is two points.
-    2. if find clue, start compare each byte forward, and make sure R2 point.
-  */
-
-#ifdef LiuJH_DEBUG
-    /*
-      NOTICE:
-        1. exceed, deal here;
-    */
-    if(ecg_R_detected + ECG_R2_MW_SIZE + 1 > ECG_RPEAK_BUF_SIZE){
-      // redo R detect, restart up ecg detection
-      ecg_status = ecg_startup_status;
-      return;
-    }
-#endif
-
-  // Have byte for detecing?
-  if(ecg_Rpeak_buf_num < ecg_R_detected + ECG_R2_MW_SIZE + 1)
+  // NOTICE: exceed, deal here
+  if(ecg_RsDetected + ECG_R2_MW_SIZE + 1 > ECG_BUF_SIZE
+    || ecg_RvDetected + ECG_R2_MW_SIZE + 1 > ECG_BUF_SIZE){
+    // redo R detect, restart up ecg detection
+    ecg_status = ecg_startup_status;
     return;
-
-  // find suspected R peak point
-  if(*p >= ecg_R1_valueV){
-    /* current point is R2 point? check it */
-
-    // 1. find inflection
-    if(ecg_R_isUpward){
-      if(*(p + 1) < *p)
-        isfixedR2 = true;
-    }else{
-      if(*(p + 1) > *p)
-        isfixedR2 = true;
-    }
-
-    // 2. check slope
-    if(isfixedR2){
-      // get slope of ECG_R2_MW_SIZE points after R2'
-      slope = ecg_getPeakPointSlope(p);
-      if(!ecg_R_isUpward)
-        slope = -slope;
-
-      // slope MUST NOT less than ecg_R_slopeV
-      if(slope >= ecg_R_slopeV){
-        /*
-          NOW:
-            got it! ecg_Rpeak_buf[ecg_R_detected] is R2 peak point;
-        */
-
-        // record ecg_RR_interval value
-        ecg_RR_interval = p - ecg_R1_pindex;
-
-        // record R value
-        ecg_R_value = (ecg_R_value + *p) >> 1;
-
-        // go into next status
-        ecg_status = ecg_Rnwaiting_status;
-      }
-    }
   }
 
-  // loop next R1 detect or enter into next status
-  ecg_R_detected++;
+  // We have enough bytes for detecting in Rs buf?
+  if(!ecg_RsOk && ecg_RsBufNum > ecg_RsDetected + ECG_R2_MW_SIZE){
+    p = ecg_RsBuf + ecg_RsDetected;
+    pdetected = &ecg_RsDetected;
+    pvalue = &ecg_RsValue;
+    pvalueV = &ecg_RsValueV;
+    poff = &ecg_Rs1Off;
+    pslopeV = &ecg_RsSlopeV;
+    pRRi = &ecg_RRsiPoint;
+    pOk = &ecg_RsOk;
+  }else if(!ecg_RvOk && ecg_RvBufNum > ecg_RvDetected + ECG_R2_MW_SIZE){
+    // We have enough bytes for detecting in Rv buf
+    p = ecg_RvBuf + ecg_RvDetected;
+    pdetected = &ecg_RvDetected;
+    pvalue = &ecg_RvValue;
+    pvalueV = &ecg_RvValueV;
+    poff = &ecg_Rv1Off;
+    pslopeV = &ecg_RvSlopeV;
+    pRRi = &ecg_RRviPoint;
+    pOk = &ecg_RvOk;
+  }else{
+    /*
+      have not enough data or cur ch is OK,
+      loop continue waiting data or other ch
+    */
+    goto ecg_smR2Detectend;
+  }
+
+  // pointer next point for comparing with *p
+  pn = p + 1;
+
+  // this point is NOT suspected R peak point? flag this point is detected, and continue next detect
+  if(*p < *pvalueV) goto ecg_smR2Detectend;
+  
+  /*
+    NOW:
+      1. *p is suspected R peak point;
+      2. we will check other param for confirming this point;
+  */
+
+  // check this point is the max value point in next six point
+  for(int i = 0; i < ECG_R2_MW_SIZE; i++){
+    // current point is not max value point? continue next detect
+    if(pn[i] > *p) goto ecg_smR2Detectend;
+  }
+
+  // check slope
+  slope = ecg_calculateSlope(p);
+  if(slope < *pslopeV) goto ecg_smR2Detectend;
+
+  /*
+    NOW:
+      1. we found R2 point(*p);
+      2. record important params for us;
+  */
+
+  // record ecg_RR_interval value
+  *pRRi = *pdetected - *poff;
+
+#ifdef LiuJH_DEBUG
+  // average R value
+  *pvalue = (*pvalue + *p) >> 1;
+  // update R value V
+  *pvalueV = (*pvalue) * ECG_R_VALUE_WEIGHT;
+#endif
+
+  // detect finished?(both rs rv channel)
+  *pOk = true;
+
+ecg_smR2Detectend:
+
+  // continue detect
+  if(pdetected)
+    *pdetected += 1;
+
+  // detected OK both?
+  if(ecg_RsOk && ecg_RvOk){
+    // go into next status
+    ecg_status = ecg_Rnwaiting_status;
+    ecg_RsOk = ecg_RvOk = false;
+  }
 }
 
 /*
   brief:
     1. The ADC sample callback function is Storing adc u8 value in RpeakBuf
       and record current max and min value index in pRpPointmax and pRpPointmin;
-    2. Get average of slope of R1, and judge ECG is upward or downward;
+    2. Get average of slope of R1;
     3. Get R1 index and tick;
-    4. Update status to R2;
+    4. Update status to detect R2;
 */
 static void ecg_smR1Detect(void)
 {
-  int32_t slope, slope1, slope2;
-  u32 num1, num2;
-
-//  RwaveUseTick = HAL_GetTick();
-
-  // we need ECG_R2_MW_SIZE data after peak point
-  num1 = ecg_R1max_pindex - ecg_Rpeak_buf;
-  num2 = ecg_R1min_pindex - ecg_Rpeak_buf;
-
-#ifdef LiuJH_DEBUG
-  /*
-    NOTICE:
-      1. Sometimes there may be ERROR(unknown reasons), deal here
-  */
-  if(num1 + ECG_R2_MW_SIZE >= ECG_RPEAK_BUF_SIZE
-    || num2 + ECG_R2_MW_SIZE >= ECG_RPEAK_BUF_SIZE){
-
+  // NOTICE: exceed max size of buffer??
+  if(ecg_Rs1Off + ECG_R2_MW_SIZE >= ECG_BUF_SIZE
+    || ecg_Rv1Off + ECG_R2_MW_SIZE >= ECG_BUF_SIZE){
     // redo R detect, restart up ecg detection
     ecg_status = ecg_startup_status;
     return;
   }
 
-#endif
+  // calculate R peak point slope and slope V value(0.80)
+  ecg_RsSlopeV = ecg_calculateSlope(ecg_RsBuf + ecg_Rs1Off) * ECG_SLOPE_WEIGHT;
+  ecg_RvSlopeV = ecg_calculateSlope(ecg_RvBuf + ecg_Rv1Off) * ECG_SLOPE_WEIGHT;
 
-  // We have enough data for slope?
-  if(ecg_Rpeak_buf_num < num1 + ECG_R2_MW_SIZE
-    || ecg_Rpeak_buf_num < num2 + ECG_R2_MW_SIZE)
-    return;
+  // get R1 value V for detect R2(NOTICE: MUST more than 0.83)
+  ecg_RsValueV = ecg_RsValue * ECG_R_VALUE_WEIGHT;
+  ecg_RvValueV = ecg_RvValue * ECG_R_VALUE_WEIGHT;
 
-  // calculate R1 slope
-  slope1 = ecg_getPeakPointSlope(ecg_R1max_pindex);
-  slope2 = -ecg_getPeakPointSlope(ecg_R1min_pindex);
+  /*
+    NOW:
+      1. R1 detect status process finished.
+      2. Ignore points of the left of R1 peak point;
+      3. init for next status(skip 180 ms from R1, and then start find R2);
+  */
+  ecg_RsDetected = ecg_Rs1Off + ECG_R2_SKIP_POINT_NUM;
+  ecg_RvDetected = ecg_Rv1Off + ECG_R2_SKIP_POINT_NUM;
 
-  // judge R wave direction and peak index, peak tick
-  if(slope1 < slope2){
-    ecg_R1_pindex = ecg_R1min_pindex;
-    ecg_R_tick = ecg_R1min_tick;
-    ecg_R_isUpward = false;
-
-    slope = slope2;
-  }else{
-    ecg_R1_pindex = ecg_R1max_pindex;
-    ecg_R_tick = ecg_R1max_tick;
-    ecg_R_isUpward = true;
-
-    slope = slope1;
-  }
-
-  // record R1 value
-  ecg_R_value = *ecg_R1_pindex;
-  // get R1 value V for detect R2
-  // 435/512 = 0.85;  (435 = 2^8 + 2^7 + 2^5 + 2^4 + 2 + 1)
-  ecg_R1_valueV = ((ecg_R_value << 8) + (ecg_R_value << 7)
-    + (ecg_R_value << 5) + (ecg_R_value << 4) + (ecg_R_value << 1)
-    + ecg_R_value) >> 9;
-
-  // calculate slope V value
-//   ecg_R_slopeV = (slope * ECG_R1_SLOPEV_MUL1) / ECG_R1_SLOPEV_MUL2;
-  // 435/512 = 0.85;  (435 = 2^8 + 2^7 + 2^5 + 2^4 + 2 + 1)
-  ecg_R_slopeV = ((slope << 8) + (slope << 7) + (slope << 5) + (slope << 4) + (slope << 1) + slope) >> 9;
-  // 461 / 512 = 0.9; (461 = 2^8 + 2^7 + 2^6 + 2^3 + 2^2 + 1)
-//  ecg_R_slopeV = ((slope << 8) + (slope << 7) + (slope << 6) + (slope << 3) + (slope << 2) + slope) >> 9;
-
-  /*NOW: R1 detect status process finished.*/
-  // Ignore points of the left of R1 peak point
-  // init for next status(skip 180 ms from R1, and then start find R2)
-  ecg_R_detected = (ecg_R1_pindex - ecg_Rpeak_buf) + ECG_R2_SKIP_POINT_NUM;
   ecg_status = ecg_R2Detect_status;
 }
 
 /*
   brief:
-    1. Value of _data is [0, 255];
-    2. If _data is adcMaxValue, his value is 255;
-    3. If _data is adcMinValue, hsi value is 0;
-    4. store data in buffer untill num is 625(2.5s);
+    1. 
 */
-static void ecg_cbSmR1waiting(u8 _data)
+static void ecg_cbSmR1Waiting(u8 _curCh, u8 _data)
 {
+  bool isRsCh = _curCh ^ ADC_CH_NUM_RV_RDET;
+  u8 *pbuf;
+  u32 *pnum, *poff, *ptick;
+  u16 *pvalue;
 
-  // waiting for adc sample data is correct
+  // wave is stable? we can start collecting??
   if(HAL_GetTick() < ecg_adcStableTick) return;
 
-  // record the first data tick in buffer
-  if(ecg_Rpeak_buf_num == 0)
-    ecg_adcStableTick = HAL_GetTick();
+  /* NOW: we can collect data into buffer */
 
-  // is the peak point? record it
-  if(_data >= ecg_max_value){
-    ecg_max_value = _data;
+  // start collect data into Rs and Rv buffer
+  ecg_addAdcDataToRbuf(_curCh, _data);
 
-    // record index in buf and its tick
-    ecg_R1max_pindex = &ecg_Rpeak_buf[ecg_Rpeak_buf_num];
-    ecg_R1max_tick = HAL_GetTick();
+  // current channel is Rs-RDET channel?
+  if(isRsCh && !ecg_RsOk){
+    pbuf = ecg_RsBuf;
+    pnum = &ecg_RsBufNum;
+    pvalue = &ecg_RsValue;
+    poff = &ecg_Rs1Off;
+    ptick = &ecg_RsTick;
+  }else if(!isRsCh && !ecg_RvOk){
+    // current channel is Rv-RDET channel?
+    pbuf = ecg_RvBuf;
+    pnum = &ecg_RvBufNum;
+    pvalue = &ecg_RvValue;
+    poff = &ecg_Rv1Off;
+    ptick = &ecg_RvTick;
+  }else{
+    /*
+      have not enough data or cur ch is OK,
+      loop continue waiting data or other ch
+    */
+    goto ecg_cbSmR1Waitingend;
   }
-  if(_data <= ecg_min_value){
-    ecg_min_value = _data;
 
-    // record index in buf and its tick
-    ecg_R1min_pindex = &ecg_Rpeak_buf[ecg_Rpeak_buf_num];
-    ecg_R1min_tick = HAL_GetTick();
+  /*
+    1. ignore some data in the starting of buf(for slope);
+    2. is the peak point? record it;
+    3. NOTICE: make sure ecg_R_value is the last max value;
+  */
+
+  // check cur data is the max value data? YES, record it
+  if(*pnum > ECG_R2_MW_SIZE && _data >= *pvalue){
+    // record data value
+    *pvalue = _data;
+    // record data offset in buf
+    *poff = (*pnum) - 1;
+    // record data tick
+    *ptick = HAL_GetTick();
   }
 
-  // add data into loop buf
-  ecg_addAdcDataToRbuf(_data);
+  // exceed buffer?
+  if(*pnum >= ECG_BUF_SIZE
+    // check the wave is stable or not(Continuous of max value)
+    || (*pvalue == ECG_MAX_BYTE_VALUE
+    && pbuf[*poff - 1] == ECG_MAX_BYTE_VALUE)){
+    // restart collect data
+    ecg_status = ecg_startup_status;
+    goto ecg_cbSmR1Waitingend;
+  }
 
-  // the last is 255? continue store data for slopeV
-  if(_data == 255) return;
+  // collect data finished? update ecg status
+  if(*pnum >= ECG_BUF_R1_NEED_NUM
+    // for slope data num
+    && *pnum > *poff + ECG_R2_MW_SIZE){
+    // which channel finished?
+    if(isRsCh)
+      ecg_RsOk = true;
+    else
+      ecg_RvOk = true;
+  }
 
-  // check data num(time line), update ecg status
-#ifndef LiuJH_DEBUG
-  // only test(copy data)
-  if(ecg_Rpeak_buf_num >= ECG_RPEAK_BUF_SIZE)
+ecg_cbSmR1Waitingend:
+  // collecting data finished both Rs-RDET and Rv-RDET channel?
+  if(ecg_RsOk && ecg_RvOk){
+    // got into next status for R1 detecting
     ecg_status = ecg_R1Detect_status;
-#else
-  if(ecg_Rpeak_buf_num >= ECG_RPEAK_BUF_NEED_NUM)
-    ecg_status = ecg_R1Detect_status;
-#endif
-}
 
-/*
-  brief:
-    1. restart R1, R2 detection for Rs RDET channel;
-    2. store Rv RDET channel vars detected;
-*/
-static void ecg_smStartup2(void)
-{
-  u32 bpm = ecg_Rv_bpm;
-  u32 tick = ecg_Rv_R1_tick;
-  u32 rri = ecg_Rv_RRi_ms;
-
-  // ecg start working flag
-  ecgIsWorking = true;
-
-  // reinit
-  ecg_init();
-
-  // restore these vars
-  ecg_Rv_bpm = bpm;
-  ecg_Rv_R1_tick = tick;
-  ecg_Rv_RRi_ms = rri;
-
-  // trim adc tick startup
-  ecg_adcTrimPeakTick = HAL_GetTick() + ADC_TRIM_PEAK_TIMEOUT;
-
-  // start R detection
-  ecg_status = ecg_R1waiting_status;
+    // clear static var for next detect
+    ecg_RsOk = ecg_RvOk = false;
+  }
 }
 
 /*
@@ -661,12 +734,11 @@ static void ecg_smStartup2(void)
 */
 static void ecg_smStartup(void)
 {
+  // reinit
+  ecg_init2();
+
   // ecg start working flag
   ecgIsWorking = true;
-
-  // reinit
-  ecg_init();
-
   // trim adc tick startup
   ecg_adcTrimPeakTick = HAL_GetTick() + ADC_TRIM_PEAK_TIMEOUT;
 
@@ -679,24 +751,24 @@ static void ecg_smStartup(void)
     1. Running in adc CB, MUST process quickly;
     2. 
 */
-static void ecg_cbStateMachine(u8 _adcByte)
+static void ecg_cbStateMachine(u8 _curCh, u8 _adcByte)
 {
   // Some status will real-time process with adcCB
   switch(ecg_status){
     case ecg_R1waiting_status:
-      // collect enough datas for R1
-      ecg_cbSmR1waiting(_adcByte);
+      ecg_cbSmR1Waiting(_curCh, _adcByte);
       break;
     case ecg_R1Detect_status:
     case ecg_R2Detect_status:
       // in these status, collect data into buf only
-      ecg_addAdcDataToRbuf(_adcByte);
+      ecg_addAdcDataToRbuf(_curCh, _adcByte);
       break;
     case ecg_Rnwaiting_status:
-      ecg_cbSmRnWaiting(_adcByte);
+      ecg_cbSmRnWaiting(_curCh, _adcByte);
       break;
     case ecg_RnDetect_status:
-      ecg_cbSmRnDetect(_adcByte);
+      if(_curCh ^ ADC_CH_NUM_RV_RDET)
+        ecg_cbSmRnDetect(_adcByte);
       break;
 
     default:
@@ -721,9 +793,6 @@ void ecg_stateMachine(void)
       break;
     case ecg_startup_status:
       ecg_smStartup();
-      break;
-    case ecg_startup2_status:
-      ecg_smStartup2();
       break;
     case ecg_R1Detect_status:
       ecg_smR1Detect();
@@ -755,36 +824,14 @@ void ecg_stateMachine(void)
     2. add in ecg buf, and update vars about buffer;
     3. This state machine only process all vars about loop buf,
        all other jobs is processed in state machine of main while;
-    4. _data is the last adc sample byte at current tick.
-    5. This function is always working at every ecg status;
-    6. This function is working in adc callback interrupt,
+    4. This function is always working at every ecg status;
+    5. This function is working in adc callback interrupt,
        so please dont waste time.
-    7. NOTE: return u8 data is test only;
 */
-void ecg_adcConvCpltCB(void)
+void ecg_adcConvCpltCB(u8 _curCh)
 {
   i32 value;
   u8 byte;
-#ifdef Insync_ICM
-  // for ICM
-  static u8 step = 0;
-
-  /*
-    ICM have only two channel, we will fixed 256Hz,
-    so we must skip some data: ADC_SAMPLE_STEP / 2 = 3;
-  */
-  if((++step) ^ ADC_ICM_SAMPLE_STEP) return;
-
-  // got it, for next value
-  step = 0;
-
-  // start process value
-#endif
-
-  /*
-    NOW:
-      sample freq adjust 512Hz;
-  */
 
   // get adc sample value
   value = (int32_t)(HAL_ADC_GetValue(&hadc) & 0x0FFF);
@@ -801,7 +848,7 @@ void ecg_adcConvCpltCB(void)
   /*
     start ecg real-time state machine process
   */
-  ecg_cbStateMachine(byte);
+  ecg_cbStateMachine(_curCh, byte);
 }
 
 /*
@@ -822,43 +869,51 @@ bool ecg_getRsviAbout(u8 *_pdata)
   // check param
   if(!_pdata) return ret;
 
-  *p++ = (u8)ecg_Rs_Rv_interval_ms;
-  *p++ = (u8)(ecg_R_tick >> 24);
-  *p++ = (u8)(ecg_R_tick >> 16);
-  *p++ = (u8)(ecg_R_tick >> 8);
-  *p++ = (u8)(ecg_R_tick);
-  *p++ = (u8)(ecg_RRi_ms >> 8);
-  *p++ = (u8)(ecg_RRi_ms);
-  *p++ = (u8)(ecg_Rv_R1_tick >> 24);
-  *p++ = (u8)(ecg_Rv_R1_tick >> 16);
-  *p++ = (u8)(ecg_Rv_R1_tick >> 8);
-  *p++ = (u8)(ecg_Rv_R1_tick);
-  *p++ = (u8)(ecg_Rv_RRi_ms >> 8);
-  *p++ = (u8)(ecg_Rv_RRi_ms);
+  *p++ = (u8)ecg_RsviTime;
+  *p++ = (u8)(ecg_RsTick >> 24);
+  *p++ = (u8)(ecg_RsTick >> 16);
+  *p++ = (u8)(ecg_RsTick >> 8);
+  *p++ = (u8)(ecg_RsTick);
+  *p++ = (u8)(ecg_RRsiTime >> 8);
+  *p++ = (u8)(ecg_RRsiTime);
+  *p++ = (u8)(ecg_RvTick >> 24);
+  *p++ = (u8)(ecg_RvTick >> 16);
+  *p++ = (u8)(ecg_RvTick >> 8);
+  *p++ = (u8)(ecg_RvTick);
+  *p++ = (u8)(ecg_RRviTime >> 8);
+  *p++ = (u8)(ecg_RRviTime);
 
   return true;
 }
 
 u8 ecg_getRsvi(void)
 {
-  return (u8)ecg_Rs_Rv_interval_ms;
+  return (u8)ecg_RsviTime;
 }
 
+/*
+  brief:
+    1. return current Rn peak point tick vlaue;
+*/
 u32 ecg_getRnTick(void)
 {
-  return ecg_R_tick;
+  return ecg_RsTick;
 }
 
 /*
 */
 u8 ecg_getBpm(void)
 {
-  return (u8)ecg_bpm;
+  return (u8)ecg_RsBpm;
 }
 
-u8 ecg_getAdcChNum(void)
+/*
+  brief:
+    1. We want get Rs-RDET and Rv-RDET data;
+*/
+bool ecg_isEcgAdcCh(u8 _curCh)
 {
-  return ecg_adcChNum;
+  return (!(_curCh ^ ADC_CH_NUM_RS_RDET) || !(_curCh ^ ADC_CH_NUM_RV_RDET));
 }
 
 /*
@@ -868,18 +923,6 @@ u8 ecg_getAdcChNum(void)
 void ecg_startup(void)
 {
   if(ecgIsWorking) return;
-
-  // select channel number
-#ifdef Insync_CCM
-  /* for CCM */
-  // default channel is RV_RDET(for getting RsRvi_ms value)
-  // but use RS_RDET channel at last
-  ecg_adcChNum = ADC_CH_NUM_RV_RDET;
-//    ecg_adcChNum = ADC_CH_NUM_RV_IEGM;
-#else
-  /* for ICM */
-  ecg_adcChNum = ADC_CH_NUM_RA_RDET;
-#endif
 
   // adc stable tick
   ecg_adcStableTick = HAL_GetTick() + ADC_WORKING_STABLE_TIME;
@@ -893,39 +936,15 @@ void ecg_startup(void)
 void ecg_init(void)
 {
   ecgIsWorking = false;
-  // init R peak point buf
-  ecg_Rpeak_buf_num = 0;
-  ecg_max_value = ECG_MAX_INIT_VALUE;
-  ecg_min_value = ECG_MIN_INIT_VALUE;
-  ecg_R1_pindex = ecg_R1max_pindex = ecg_R1min_pindex = &ecg_Rpeak_buf[0];
-  ecg_R_tick = ecg_R1max_tick = ecg_R1min_tick = ecg_bufLastDataTick = 0;
-  ecg_R_isUpward = true;
-  ecg_R_slopeV = 0;
-  ecg_RR_interval = ecg_PPi_us = ecg_RRi_ms = 0;
-  ecg_bpm = 0xFF;
-  ecg_R_value = 0;
-  ecg_Rn_detected = ecg_Rn_escaped = ecg_Rn_continue_escaped = 0;
+
+  ecg_init2();
 
   // init peak value
   ecg_adcMaxValue = ecg_adcPeakMaxValue = ADC_MIN_VALUE;
   ecg_adcMinValue = ecg_adcPeakMinValue = ADC_MAX_VALUE;
 
-  /*
-    NOTICE:
-      adc channel num DONT init
-  */
-
-  ecg_Rv_bpm = 0;
-  ecg_Rv_R1_tick = 0;
-  ecg_Rv_RRi_ms = 0;
-  ecg_Rs_Rv_interval_ms = 0;
-
   // status init
   ecg_status = ecg_inited_status;
 }
-
-
-
-
 
 

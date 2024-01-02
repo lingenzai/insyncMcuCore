@@ -97,8 +97,8 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
   /* check channel num, toast ecg or ble or igore */
 
   // is ecg channel data?
-  if(!(adc_curChNum ^ ecg_getAdcChNum())){
-    ecg_adcConvCpltCB();
+  if(ecg_isEcgAdcCh(adc_curChNum)){
+    ecg_adcConvCpltCB(adc_curChNum);
   }
 
   // is ble channel data?

@@ -19,6 +19,7 @@ static u32 ovbc_VposEnTick;
 static u8 ovbc_pulsingLoopNum;
 
 
+
 /* private function define ******************************************/
 
 static void ovbc_smVposEn(void);
@@ -141,13 +142,12 @@ static void ovbc_smStartup(void)
   u32 ChipEnTick;
   u32 wkcount;
 
-#ifdef LiuJH_PULSE
+#ifdef LiuJH_DEBUG
   // VposEnTick
-  ovbc_VposEnTick = ecg_getRnTick() + 10 + pulse_getConfig()->pulse_delay_ms;
-
+  ovbc_VposEnTick = ecg_getRnTick() + pulse_getConfig()->pulse_Rsvi_ms + pulse_getConfig()->pulse_Rv_delay_ms;
 #else
   // VposEnTick
-  ovbc_VposEnTick = ecg_getRnTick() + ecg_getRsvi() + pulse_getConfig()->pulse_delay_ms;
+  ovbc_VposEnTick = ecg_getRnTick() + ecg_getRsvi() + pulse_getConfig()->pulse_Rv_delay_ms;
 #endif
 
   // chip start up need 15ms
