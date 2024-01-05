@@ -22,7 +22,6 @@ static mcu_MotionConfig_typeDef mcu_motionCfg;
 
 static mcu_spiStatus_typeDef mcu_spiStatus;
 
-static u32 mcu_lpmTick;
 /*
 Data Format:
        Data：04 - Vout output low 
@@ -61,15 +60,20 @@ static void mcu_LpmInit(void)
   // Clear wakeup flags
 //  if(__HAL_PWR_GET_FLAG(PWR_FLAG_WU))
     __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
-  
+
+  /* Clear the EXTI's line Flag for RTC WakeUpTimer */
+//  __HAL_RTC_WAKEUPTIMER_EXTI_CLEAR_FLAG();
+  /* Clear the Wakeup timer interrupt pending bit */
+//  __HAL_RTC_WAKEUPTIMER_CLEAR_FLAG(hrtc, RTC_FLAG_WUTF);
+
   // clear all RCC_CSR reset status flags
   __HAL_RCC_CLEAR_RESET_FLAGS();
 
   /*Disable all used wakeup sources: Pin1(PA.0)*/
-//  HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN1);
+  HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN1);
 
   /*Re-enable all used wakeup sources: Pin1(PA.0)*/
-//  HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1);
+  HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1);
 
 #ifdef LiuJH_DEBUG
   // Enables the Debug Module during STANDBY mode
@@ -133,7 +137,7 @@ static void mcu_restoreKValue(void)
 */
 static bool mcu_isMagnetWakeup(void)
 {
-#ifdef LiuJH_DEBUG
+#ifndef LiuJH_DEBUG
   // only test
   return true;
 //  return false;
@@ -153,7 +157,7 @@ static bool mcu_isMagnetWakeup(void)
     HAL_Delay(1);
   }
 
-  return (count > 3);
+  return (count > 2);
 #endif
 }
 
@@ -164,6 +168,7 @@ static bool mcu_isMagnetWakeup(void)
 */
 static void mcu_judgeWkupReason(void)
 {
+  // we have judged wakeup reason?
   if(mcu_rstFlag != mcu_rstFlag_wakeup) return;
 
   /*
@@ -195,7 +200,7 @@ static bool mcu_noDeviceWorking(void)
 //    || adc_isWorking()
     ){
     // set lpm tick
-    mcu_lpmTick = HAL_GetTick();
+//    mcu_lpmTick = HAL_GetTick();
 
     return false;
   }
@@ -248,11 +253,8 @@ static void mcu_setGpioFloatingInput(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-  /*Set all GPIO in analog state to reduce power consumption*/
-
-//  __HAL_RCC_GPIOA_CLK_ENABLE();
-//  __HAL_RCC_GPIOB_CLK_ENABLE();
-//  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   // Analog Mode
 //  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
@@ -261,31 +263,18 @@ static void mcu_setGpioFloatingInput(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-#ifdef LiuJH_DEBUG
-  /*
-    NOTE:
-      During debugging, PA13 and PA14 are debugging pins and cannot be adjusted;
-      No problem when the version was released;
-  */
-  GPIO_InitStruct.Pin = GPIO_PIN_All & (~GPIO_PIN_13) & (~GPIO_PIN_14);
-#else
-  GPIO_InitStruct.Pin = GPIO_PIN_All;
-#endif
-
-  HAL_GPIO_Init(GPIOA,&GPIO_InitStruct);
+  // keep PA13 and PA14 for debugging, and keep PA0 for wakeup;
+  GPIO_InitStruct.Pin = GPIO_PIN_All & (~CCM_PIN10_WKUP_INTR_Pin) & (~GPIO_PIN_13) & (~GPIO_PIN_14);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   // this pin MUST set, otherwise STWLC38 is very consume power
-  GPIO_InitStruct.Pin = GPIO_PIN_All & (~CCM_PIN21_BOOST_ON_Pin) & (~CCM_PIN25_MEM_CS_Pin)&(~CCM_PIN45_VOUT_SET_Pin);
-  HAL_GPIO_Init(GPIOB,&GPIO_InitStruct);
-//  GPIO_InitStruct.Pin = GPIO_PIN_All;
-//  HAL_GPIO_Init(GPIOC,&GPIO_InitStruct);
+  GPIO_InitStruct.Pin = GPIO_PIN_All & (~CCM_PIN45_VOUT_SET_Pin) & (~CCM_PIN21_BOOST_ON_Pin) & (~CCM_PIN25_MEM_CS_Pin);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  __HAL_RCC_GPIOA_CLK_DISABLE();
-  __HAL_RCC_GPIOB_CLK_DISABLE();
-//  __HAL_RCC_GPIOC_CLK_DISABLE();
+  //__HAL_RCC_GPIOA_CLK_DISABLE();
+  //__HAL_RCC_GPIOB_CLK_DISABLE();
 
-  // Johnny: Restore WKUP1,BLE_CS,RSl10_RST origin state??
-//  MX_GPIO_Init();
+  // Johnny: Need keep RSl10_RST state??
 }
 
 /*
@@ -325,10 +314,10 @@ static void mcu_setLpmWakeupTimer(void)
 
 #ifndef LiuJH_DEBUG
   // set 3s timer; ONLY test
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, RTC_WAKEUP_TIME_3S, RTC_WAKEUPCLOCK_RTCCLK_DIV16);
+  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, RTC_WAKEUP_TIME_5S, RTC_WAKEUPCLOCK_RTCCLK_DIV16);
 #else
-//  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, sec, RTC_WAKEUPCLOCK_CK_SPRE_16BITS);
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 30, RTC_WAKEUPCLOCK_CK_SPRE_16BITS);
+  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, sec, RTC_WAKEUPCLOCK_CK_SPRE_16BITS);
+//  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 5, RTC_WAKEUPCLOCK_CK_SPRE_16BITS);
 #endif
 }
 
@@ -343,22 +332,6 @@ static void mcu_enterStandbyMode(void)
   // test only for LPM
 
 #else
-  static u8 count = 0;
-
-  if(HAL_GetTick() < mcu_lpmTick) return;
-
-  count++;
-
-  /* ask rsl10 enter LPM */
-  if(!ble_askRsl10EnterLpm()){
-
-    mcu_lpmTick = HAL_GetTick() + BLE_QUERY_TIMEOUT;
-
-    // ask RSL10 three times, so give up
-    if(count < 3) return;
-  }
-
-  count = 0;
 
   /* NOW: we can go into LPM */
 
@@ -402,7 +375,6 @@ static void mcu_init(void)
   
 
   mcu_motionTick = 0;
-  mcu_lpmTick = 0;
 }
 
 
@@ -731,18 +703,25 @@ void mcu_sysInit(void)
 
   mcu_rstFlag = mcu_rstFlag_others;
 
-#ifndef LiuJH_DEBUG
   // Note these code for test, dont enter LPM when power on
 
   // Is wakeup from standby mode?
   if(!__HAL_PWR_GET_FLAG(PWR_FLAG_SB) ||
      !__HAL_PWR_GET_FLAG(PWR_FLAG_WU)){
-	  return;
-  }
-#endif
 
-  // set wakup flag
-  mcu_rstFlag = mcu_rstFlag_wakeup;
+	  //return;
+
+	  // define power on as BLE mode startup(Dont enter into LPM immediately when power on)
+#ifdef LiuJH_DEBUG
+    mcu_rstFlag = mcu_rstFlag_MagnetHall;
+#else
+	  mcu_rstFlag = mcu_rstFlag_RtcTimer;
+#endif
+  }else{
+    // if set wakeup flag, judge ble or pulse mode
+    // set wakup flag
+    mcu_rstFlag = mcu_rstFlag_wakeup;
+  }
 
 #ifndef LiuJH_DEBUG
   // this method dont work

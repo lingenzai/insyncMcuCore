@@ -28,7 +28,7 @@
 */
 static bool ee_readData(u32 _addr, u8 *_pdata, u32 _len)
 {
-#ifndef LiuJH_DEBUG
+#ifdef LiuJH_DEBUG
   bool ret = false;
   u8 *pd = _pdata;
   __IO u8 *ps = (__IO u8 *)(_addr);
@@ -58,7 +58,7 @@ static bool ee_readData(u32 _addr, u8 *_pdata, u32 _len)
 */
 static void ee_writeBaseType(u32 _type, u32 _addr, u32 _data)
 {
-#ifndef LiuJH_DEBUG
+#ifdef LiuJH_DEBUG
   HAL_FLASHEx_DATAEEPROM_Unlock();
   HAL_FLASHEx_DATAEEPROM_Program(_type, _addr, _data);
   HAL_FLASHEx_DATAEEPROM_Lock();
@@ -71,12 +71,26 @@ static void ee_writeBaseType(u32 _type, u32 _addr, u32 _data)
 */
 static bool ee_writeData(u32 _addr, u8 *_pdata, u32 _len)
 {
+#ifdef LiuJH_DEBUG
+  // check param
+  if(!IS_FLASH_DATA_ADDRESS(_addr) || !_pdata || 
+    !IS_FLASH_DATA_ADDRESS(_addr + _len - 1))
+    return false;
+
+
+  while(_len){
+    ee_writeBaseType(ee_byte_type, _addr++, *_pdata++);
+    _len--;
+  }
+
+  return true;
+#else
   bool ret = false;
   u32 *pd4 = (u32 *)_addr;
   u16 *pd2;
   u32 *ps4 = (u32 *)_pdata;
   u16 *ps2;
-  u32 num;
+  u32 num = _len;
 //  u32 tick = HAL_GetTick();
 
   // check param
@@ -107,6 +121,7 @@ static bool ee_writeData(u32 _addr, u8 *_pdata, u32 _len)
 
 //  tick = HAL_GetTick() - tick;
   return true;
+#endif
 }
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private function define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
@@ -184,7 +199,6 @@ bool ee_storeKeyValue(void)
   len = ee_addr_pulseConfig_size;
   ee_writeData(addr, pdata, len);
   // the last data write time delay, need it???
-//  HAL_Delay(2);
 
   // Param2: unpulsing period
   addr = ee_addr_unpulsingPeriod;

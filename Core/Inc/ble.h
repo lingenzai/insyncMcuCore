@@ -84,21 +84,6 @@ typedef enum{
   */
   ble_reqSTecg_status,
   /*
-    1. enable STWLC38 and update voltage, start charging;
-    2. update status to charging;
-  */
-  ble_reqCharge_status,
-  /*
-    1. adc check current voltage(query or interrupt???);
-    2. if full charge, update status to charged;
-  */
-  ble_charging_status,
-  /*
-    1. disable STWLC38 and notify RSl10 through SPI;
-    2. update status to reqWaiting;
-  */
-  ble_charged_status,
-  /*
     1. enter ota status, nothing to do, but is working;
     2. for waiting rsl10 fota without LPM;
   */
@@ -110,7 +95,6 @@ typedef enum{
 
 /* extern public function ------------------------------------------------- */
 
-extern bool ble_askRsl10EnterLpm(void);
 extern void ble_spiTxRxCpltCB(SPI_HandleTypeDef *hspi);
 extern void ble_adcConvCpltCB(void);
 extern void ble_stateMachine(void);

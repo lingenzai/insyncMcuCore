@@ -83,6 +83,9 @@ static u32 pulse_getLastMinute(u32 _m)
 */
 static bool pulse_isPulseTime(void)
 {
+#ifndef LiuJH_DEBUG
+  return true;
+#else
   bool ret = false;
   u32 m1, m2;
 
@@ -101,24 +104,28 @@ static bool pulse_isPulseTime(void)
   m1 = (m1 * 24 + mcu_time.Hours) * 60 + mcu_time.Minutes;
   // is in unpulsing period?
   if(m1 >= pulse_unpulsingPeriod.startDt
-    && m1 <= pulse_unpulsingPeriod.endDt)
+    && m1 <= pulse_unpulsingPeriod.endDt){
     return ret;
+  }
 
   /* compare pulsing time of every day */
 
   // dont need send pulse?
-  if(pulse_config.pulse_start_time == pulse_config.pulse_end_time)
+  if(pulse_config.pulse_start_time == pulse_config.pulse_end_time){
     return ret;
+  }
 
   // current time convert to Minutes
   m1 = mcu_time.Hours * 60 + mcu_time.Minutes;
   m2 = pulse_config.pulse_start_time;
 
   // compare time(unit: minutes)
-  if(m1 == m2 || m1 == pulse_getLastMinute(m2) || m1 == pulse_getNextMinute(m2))
+  if(m1 == m2 || m1 == pulse_getLastMinute(m2) || m1 == pulse_getNextMinute(m2)){
     ret = true;
+  }
 
   return ret;
+#endif
 }
 
 /*
@@ -259,17 +266,21 @@ static void pulse_smStartupProc(void)
   u32 time = 0;
 
   pulse_init();
+  pulseIsWorking = true;
 
   // start all six channel
   adc_startup();
 
+#ifndef LiuJH_DEBUG
+  time = 5;
+#else
   // get pulse work seconds
   if(pulse_config.pulse_end_time < pulse_config.pulse_start_time)
     time = MCU_MAX_MINUTE_EACH_DAY + pulse_config.pulse_end_time - pulse_config.pulse_start_time;
   else
     time = pulse_config.pulse_end_time - pulse_config.pulse_start_time;
+#endif
   pulse_workOverTick = HAL_GetTick() + time * 60;
-  pulseIsWorking = true;
 
   pulse_status = pulse_waiting_status;
 }

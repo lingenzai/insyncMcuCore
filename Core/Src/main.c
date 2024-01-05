@@ -191,6 +191,10 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+
+  /** Enables the Clock Security System
+  */
+  HAL_RCCEx_EnableLSECSS();
 }
 
 /**
@@ -474,10 +478,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, CCM_PIN20_RSL10_WKUP_Pin|CCM_PIN46_VPON_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, CCM_PIN21_BOOST_ON_Pin|CCM_PIN25_MEM_CS_Pin|CCM_PIN45_VOUT_SET_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOB, CCM_PIN18_RSL10_RST_Pin|CCM_PIN21_BOOST_ON_Pin|CCM_PIN25_MEM_CS_Pin|CCM_PIN45_VOUT_SET_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, CCM_PIN32_VPOS_EN_Pin|CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
@@ -485,18 +486,15 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(CCM_PIN38_BLE_CS_GPIO_Port, CCM_PIN38_BLE_CS_Pin, GPIO_PIN_SET);
 
-  /*Configure GPIO pin : CCM_PIN19_WPR_INT_Pin */
-  GPIO_InitStruct.Pin = CCM_PIN19_WPR_INT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(CCM_PIN19_WPR_INT_GPIO_Port, &GPIO_InitStruct);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : CCM_PIN20_RSL10_WKUP_Pin */
-  GPIO_InitStruct.Pin = CCM_PIN20_RSL10_WKUP_Pin;
+  /*Configure GPIO pins : CCM_PIN18_RSL10_RST_Pin CCM_PIN46_VPON_Pin */
+  GPIO_InitStruct.Pin = CCM_PIN18_RSL10_RST_Pin|CCM_PIN46_VPON_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(CCM_PIN20_RSL10_WKUP_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : CCM_PIN21_BOOST_ON_Pin CCM_PIN25_MEM_CS_Pin CCM_PIN45_VOUT_SET_Pin */
   GPIO_InitStruct.Pin = CCM_PIN21_BOOST_ON_Pin|CCM_PIN25_MEM_CS_Pin|CCM_PIN45_VOUT_SET_Pin;
@@ -525,20 +523,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(CCM_PIN38_BLE_CS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : CCM_PIN46_VPON_Pin */
-  GPIO_InitStruct.Pin = CCM_PIN46_VPON_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(CCM_PIN46_VPON_GPIO_Port, &GPIO_InitStruct);
-
   /**/
   HAL_I2CEx_EnableFastModePlus(I2C_FASTMODEPLUS_PB9);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI0_1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI0_1_IRQn);
-
   HAL_NVIC_SetPriority(EXTI4_15_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 

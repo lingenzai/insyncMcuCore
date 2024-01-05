@@ -153,12 +153,7 @@ static bool ble_needShowPulsing(void)
 
   // "RTecg is working" ignore(Be checked already)
 
-#ifdef LiuJH_DEBUG
   if(ble_pulseShowFlag){
-#else
-  // check "ble switch ON pulse" and "ecg set show flag"
-  if(pulse_blePulsingIsOn() && ble_pulseShowFlag){
-#endif
     // Only once sending flag
     ble_pulseShowFlag = false;
 
@@ -209,25 +204,17 @@ static void ble_recordPeakValue(i32 _adcValue)
 */
 static void ble_startup(void)
 {
-#ifdef LiuJH_DEBUG
+#ifndef LiuJH_DEBUG
   // use wakup pin to wakeup RSL10 if magnethall exist(Rising edge)
   HAL_Delay(10);
   HAL_GPIO_WritePin(CCM_PIN20_RSL10_WKUP_GPIO_Port, CCM_PIN20_RSL10_WKUP_Pin, GPIO_PIN_SET);
   HAL_Delay(10);
   HAL_GPIO_WritePin(CCM_PIN20_RSL10_WKUP_GPIO_Port, CCM_PIN20_RSL10_WKUP_Pin, GPIO_PIN_RESET);
 #else
-//  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  // use NRESET pin of RSL10 chip to wakeup RSL10 if magnethall exist(Rising edge)
   HAL_GPIO_WritePin(CCM_PIN18_RSL10_RST_GPIO_Port, CCM_PIN18_RSL10_RST_Pin, GPIO_PIN_RESET);
- // HAL_Delay(10);
-//  HAL_GPIO_WritePin(CCM_PIN18_RSL10_RST_GPIO_Port, CCM_PIN18_RSL10_RST_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin : CCM_PIN18_RSL10_RST_Pin */
-/*
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(CCM_PIN18_RSL10_RST_GPIO_Port, &GPIO_InitStruct);
-*/
+  HAL_Delay(10);
+  HAL_GPIO_WritePin(CCM_PIN18_RSL10_RST_GPIO_Port, CCM_PIN18_RSL10_RST_Pin, GPIO_PIN_SET);
 #endif
 }
 
@@ -796,8 +783,8 @@ static void ble_dealReqCommand(void)
   u8 reqid = ble_spiRxBuf[BLE_P_COMMAND_INDEX];
 
   switch(reqid){
-#ifndef LiuJH_DEBUG
-    // app told mcu we can LPM
+#ifdef LiuJH_DEBUG
+    // app told mcu we can LPM(0x11)
     case ble_p_sleep:
       /*
         1. Only go into idle status;
@@ -1099,33 +1086,6 @@ static bool ble_queryReqFromUser(void)
 
 /*
   brief:
-    1. disable STWLC38 and notify RSl10 through SPI;
-    2. update status to reqWaiting;
-*/
-static void ble_smCharged(void)
-{
-}
-
-/*
-  brief:
-    1. adc check current voltage(query or interrupt???);
-    2. if full charge, update status to charged;
-*/
-static void ble_smCharging(void)
-{
-}
-
-/*
-  brief:
-    1. enable STWLC38 and update voltage, start charging;
-    2. update status to charging;
-*/
-static void ble_smReqCharge(void)
-{
-}
-
-/*
-  brief:
     1. sending store ecg in spi flash to RSL10 through SPI;
     2. if sending completed, goto reqWaiting status;
 */
@@ -1396,44 +1356,6 @@ static void ble_smInited(void)
 
 /*^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ public function define start ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^*/
 
-/*
-  brief:
-    1. 
-*/
-bool ble_askRsl10EnterLpm(void)
-{
-#ifdef LiuJH_DEBUG
-  return false;
-#else
-  u8 txbuf[SPI_SEND_NUM]= {BLE_P_HEAD, ble_p_rsl10AgreeEnterLpm};
-  u8 rxbuf[SPI_SEND_NUM];
-  bool status;
-  bool ret = false;
-
-  // clear buf
-  memset(txbuf, 0, sizeof(txbuf));
-  memset(rxbuf, 0, sizeof(rxbuf));
-
-  // pad protocol data
-  // head
-  txbuf[0] = BLE_P_HEAD;
-  // command code
-  txbuf[1] = ble_p_rsl10AgreeEnterLpm;
-  // cs
-  txbuf[SPI_SEND_NUM - 1] = txbuf[0] ^ txbuf[1];
-
-  // ask ble go into LPM by SPI
-  BLE_CS_ASSERTED;
-  status = HAL_SPI_TransmitReceive(&hspi2, txbuf, rxbuf, sizeof(txbuf), BLE_SPI_TIMEOUT);
-  BLE_CS_DEASSERTED;
-
-  // check received flag
-  if(status && !(rxbuf[BLE_P_COMMAND_INDEX] ^ ble_p_rsl10AgreeEnterLpm))
-    ret = true;
-
-  return ret;
-#endif
-}
 
 /*
   brief:
@@ -1534,15 +1456,6 @@ void ble_stateMachine(void)
       break;
     case ble_reqSTecg_status:
       ble_smReqSTecg();
-      break;
-    case ble_reqCharge_status:
-      ble_smReqCharge();
-      break;
-    case ble_charging_status:
-      ble_smCharging();
-      break;
-    case ble_charged_status:
-      ble_smCharged();
       break;
 
     case ble_reqFota_status:

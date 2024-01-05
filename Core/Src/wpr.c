@@ -345,7 +345,7 @@ static void wpr_smStartup(void)
   wpr_configStwlc38();
 
   // get batt value for the first time
-  wpr_battUpdateTick = HAL_GetTick();
+  wpr_battUpdateTick = HAL_GetTick() + TIMEOUT_100MS;
   // enter into next status
   wpr_status = wpr_Waiting_status;
 }
@@ -413,12 +413,17 @@ void wpr_adcConvCpltCB(void)
 */
 bool wpr_isUltraLowBattLevel(void)
 {
+#ifndef LiuJH_DEBUG
+  return false;
+#else
   bool ret = false;
 
-  if(wprIsWorking && wpr_battValue < WPR_BATT_LOW_THRESHOLD)
+  // wpr is working and battery value is valid? so check the value is low batt or not
+  if(wprIsWorking && wpr_battValue && wpr_battValue < WPR_BATT_LOW_THRESHOLD)
     ret = true;
 
   return ret;
+#endif
 }
 
 /*
