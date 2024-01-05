@@ -263,7 +263,7 @@ static void pulse_smWaitingProc(void)
 */
 static void pulse_smStartupProc(void)
 {
-  u32 time = 0;
+  u32 minutes = 0;
 
   pulse_init();
   pulseIsWorking = true;
@@ -272,15 +272,16 @@ static void pulse_smStartupProc(void)
   adc_startup();
 
 #ifndef LiuJH_DEBUG
-  time = 5;
+  minutes = 1;
 #else
   // get pulse work seconds
   if(pulse_config.pulse_end_time < pulse_config.pulse_start_time)
-    time = MCU_MAX_MINUTE_EACH_DAY + pulse_config.pulse_end_time - pulse_config.pulse_start_time;
+    minutes = MCU_MAX_MINUTE_EACH_DAY + pulse_config.pulse_end_time - pulse_config.pulse_start_time;
   else
-    time = pulse_config.pulse_end_time - pulse_config.pulse_start_time;
+    minutes = pulse_config.pulse_end_time - pulse_config.pulse_start_time;
 #endif
-  pulse_workOverTick = HAL_GetTick() + time * 60;
+  // get tick(unit: ms)
+  pulse_workOverTick = HAL_GetTick() + minutes * 60 * 1000;
 
   pulse_status = pulse_waiting_status;
 }

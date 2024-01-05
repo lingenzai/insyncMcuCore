@@ -13,7 +13,7 @@
 
 // RTC Timer LSI RC(37KHz) DIV2 unit count
 //#define OVBC_RTC_WKUP_COUNT_UNIT    37 / 2
-// RTC Timer LSE ORC(32.768 KHz) DIV2 unit count
+// RTC Timer LSE ORC(32.768 KHz) DIV2 counts per 1 ms
 #define OVBC_RTC_WKUP_COUNT_UNIT    16384 / 1000  // 32768 / 2000
 
 // Unit of pulse config->pulse_width is 0.1ms

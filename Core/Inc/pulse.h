@@ -61,7 +61,7 @@ typedef struct{
   // pulse width(unit: 0.1ms), so width / 10 = count of ms
   u8 pulse_width;
 
-  // convert to Minutes
+  // convert to Minutes(unit: minute)
   u32 pulse_start_time;
   u32 pulse_end_time;
 } pulse_config_typeDef, *ppulse_config_typeDef;
