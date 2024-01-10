@@ -394,11 +394,13 @@ static void ecg_smRnWaiting2(void)
 
   // get RRi_ms and ecg_bpm for Rs
   ecg_RRsiTime = ecg_RRsiPoint * ecg_RsPPiTime / 1000;
-  ecg_RsBpm = 60 * 1000 / ecg_RRsiTime;
+  if(ecg_RRsiTime)
+    ecg_RsBpm = 60 * 1000 / ecg_RRsiTime;
 
   // get RRi_ms and ecg_bpm for Rv
   ecg_RRviTime = ecg_RRviPoint * ecg_RvPPiTime / 1000;
-  ecg_RvBpm = 60 * 1000 / ecg_RRviTime;
+  if(ecg_RRviTime)
+    ecg_RvBpm = 60 * 1000 / ecg_RRviTime;
 
   // check bpm is qual
   if(ecg_RsBpm != ecg_RvBpm){
@@ -419,7 +421,8 @@ static void ecg_smRnWaiting2(void)
   */
   // Base R1 tick and current tick, calculate R_detected value for next Rn peak point
   tick = HAL_GetTick() - ecg_RsTick;
-  tick %= ecg_RRsiTime;
+  if(ecg_RRsiTime)
+    tick %= ecg_RRsiTime;
   ecg_RsDetected = tick * 1000 / ecg_RsPPiTime;
 
 #ifdef LiuJH_DEBUG

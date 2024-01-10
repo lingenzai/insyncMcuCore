@@ -210,7 +210,10 @@ static void ovbc_stateMachine(void)
 */
 void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef *hrtc)
 {
-  ovbc_stateMachine();
+  if(fovbc_isWorking())
+    fovbc_stateMachine();
+  else
+    ovbc_stateMachine();
 }
 
 /*

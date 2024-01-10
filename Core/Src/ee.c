@@ -53,20 +53,6 @@ static bool ee_readData(u32 _addr, u8 *_pdata, u32 _len)
 
 /*
   brief:
-    1. write data to EEPROM according _type;
-    2. 
-*/
-static void ee_writeBaseType(u32 _type, u32 _addr, u32 _data)
-{
-#ifdef LiuJH_DEBUG
-  HAL_FLASHEx_DATAEEPROM_Unlock();
-  HAL_FLASHEx_DATAEEPROM_Program(_type, _addr, _data);
-  HAL_FLASHEx_DATAEEPROM_Lock();
-#endif
-}
-
-/*
-  brief:
     1. 
 */
 static bool ee_writeData(u32 _addr, u8 *_pdata, u32 _len)
@@ -78,10 +64,13 @@ static bool ee_writeData(u32 _addr, u8 *_pdata, u32 _len)
     return false;
 
 
+  HAL_FLASHEx_DATAEEPROM_Unlock();
   while(_len){
-    ee_writeBaseType(ee_byte_type, _addr++, *_pdata++);
+    HAL_FLASHEx_DATAEEPROM_Program(ee_byte_type, _addr++, *_pdata++);
     _len--;
+    HAL_Delay(5);
   }
+  HAL_FLASHEx_DATAEEPROM_Lock();
 
   return true;
 #else

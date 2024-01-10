@@ -43,6 +43,8 @@ extern "C" {
 #include "wpr.h"
 #include "flash.h"
 #include "ovbc.h"
+#include "fpulse.h"
+#include "fovbc.h"
 
 
 /* USER CODE END Includes */
@@ -97,6 +99,8 @@ extern void main_adcConfigAllCh(void);
 #define CCM_PIN25_MEM_CS_GPIO_Port GPIOB
 #define CCM_PIN26_SP1_CLK_Pin GPIO_PIN_13
 #define CCM_PIN26_SP1_CLK_GPIO_Port GPIOB
+#define PIN30_PA9_WLC38_ON_Pin GPIO_PIN_9
+#define PIN30_PA9_WLC38_ON_GPIO_Port GPIOA
 #define CCM_PIN32_VPOS_EN_Pin GPIO_PIN_11
 #define CCM_PIN32_VPOS_EN_GPIO_Port GPIOA
 #define CCM_PIN33_VNEG_EN_Pin GPIO_PIN_12

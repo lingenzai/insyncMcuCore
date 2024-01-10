@@ -102,6 +102,7 @@ extern bool ble_isWorking(void);
 extern void ble_init(void);
 extern bool ble_isBleAdcCh(u8 _curCh);
 extern void ble_setPulseShowFlag(void);
+extern void ble_resetRSL10(void);
 
 
 

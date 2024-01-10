@@ -293,6 +293,18 @@ static void ble_respUserReqBase(u8 _cmd, u8 *_pdata, u32 _datalen)
 
 
 /*
+*/
+static void ble_startupFpulse(u8 _reqId)
+{
+  // startup force pulsing
+  fpulse_startupPulsing(ble_spiRxBuf[BLE_P_DATA_INDEX]);
+
+
+  // response RSL10
+  ble_respUserReqOkOrErr(_reqId, true);
+}
+
+/*
   brief:
     1. 
 */
@@ -813,9 +825,13 @@ static void ble_dealReqCommand(void)
       break;
     // startup pulsing(0x15)
     case ble_p_pulse_on:
-      pulse_bleConfigPulseOn(true);
-      // response user OK
-      ble_respUserReqOkOrErr(reqid, true);
+      if(fpulse_isWorking()){
+        ble_respUserReqOkOrErr(reqid, false);
+      }else{
+        pulse_bleConfigPulseOn(true);
+        // response user OK
+        ble_respUserReqOkOrErr(reqid, true);
+      }
       break;
     // stop pulsing(0x16)
     case ble_p_pulse_off:
@@ -988,6 +1004,11 @@ static void ble_dealReqCommand(void)
     // RSL10 write accel config value(0x3A)
     case ble_p_write_AccelCfg:
       ble_reqWriteAccelCfg(reqid);
+      break;
+
+    // RSL10 told mcu: force pulsing ignore R wave and others condition(0x3C)
+    case ble_p_forcePulsing:
+      ble_startupFpulse(reqid);
       break;
 
 
@@ -1212,7 +1233,7 @@ static void ble_smReqRTecg(void)
 */
 static void ble_smSetVoutSet(void)
 {
-  if(ovbc_isWorking()) return;
+  if(ovbc_isWorking() || fovbc_isWorking()) return;
 
   // config Vout_set Pin
   mcu_setVoutsetPin(ble_VoutSetValue);
@@ -1280,15 +1301,23 @@ static void ble_smReqWaiting(void)
   // still in this status? query loop continue
   if(ble_status == ble_reqWaiting_status){
 
-#ifndef LiuJH_DEBUG // only test: dont sleep
+#ifdef LiuJH_DEBUG // only test: dont sleep
     // current status is timeout?
     if(HAL_GetTick() > ble_timeoutTick){
-      // go into idle status
-      ble_status = ble_idle_status;
-    }else
+      // loop in this status if we are charging
+      if(wpr_isCharging()){
+        // req waiting period
+        ble_timeoutTick = HAL_GetTick() + BLE_WAITING_TIMEOUT;
+
+      }else{
+        // go into idle status
+        ble_status = ble_idle_status;
+      }
+    }
 #endif
-      // next loop: RSl10 command query period
-      ble_queryTick = HAL_GetTick() + BLE_QUERY_TIMEOUT;
+
+    // next loop: RSl10 command query period
+    ble_queryTick = HAL_GetTick() + BLE_QUERY_TIMEOUT;
   }
 }
 
@@ -1468,6 +1497,13 @@ void ble_stateMachine(void)
   // trim adc peak value for R detection
   ble_trimAdcPeak();
 
+}
+
+/*
+*/
+void ble_resetRSL10(void)
+{
+  ble_startup();
 }
 
 /*

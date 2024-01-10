@@ -109,6 +109,8 @@ typedef enum{
   // RSL10 write accel config value(0x3A)
   ble_p_write_AccelCfg,
 
+  // RSL10 told mcu: force pulsing ignore R wave and others condition(0x3C)
+  ble_p_forcePulsing = 0x3C,
 
   // rsl10 told mcu: its status is IDLE, no other command(0x60)
   ble_p_rsl10IsIdle = 0x60,

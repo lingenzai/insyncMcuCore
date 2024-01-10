@@ -108,17 +108,6 @@ typedef enum{
     2. finish pulsing, update to waiting status;
   */
   pulse_pulsing_status,
-  /*
-    1. set pin high the first time;
-    2. time is 2.5ms;
-  */
-  pulse_high_status,
-  /*
-    1. set pin low the first time;
-    2. time is 2.5ms;
-  */
-  pulse_low_status,
-
 
   pulse_max_status
 } pulse_status_typeDef;

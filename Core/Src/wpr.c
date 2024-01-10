@@ -31,6 +31,7 @@ static wpr_chargeSwitch_typeDef wpr_chargeSwitch;
 #ifndef LiuJH_DEBUG
 static u32 adcbuf[32];
 static u32 adclen;
+static u32 buftick;
 #endif
 
 
@@ -121,16 +122,9 @@ static u16 wpr_calculateBattLevel(void)
   u16 ret = 0;
   u32 adc = wpr_adcValue;
   // adc max value(4.2V); adc min value(3.0V)
-  u32 max = WPR_ADC_MAX_VALUE_D;
-  u32 min = WPR_ADC_MIN_VALUE_D;
-
-#ifndef LiuJH_DEBUG
-  // check wpr status, get correct max and min value
-  if(wpr_status == wpr_charging_status){
-    max = WPR_ADC_MAX_VALUE_E;
-    min = WPR_ADC_MIN_VALUE_E;
-  }
-#endif
+  u32 max = WPR_ADC_MAX_VALUE;
+  u32 min = WPR_ADC_MIN_VALUE;
+  u32 div = max - min;
 
   // over flow max or min adc value?
   if(adc > max){
@@ -139,8 +133,8 @@ static u16 wpr_calculateBattLevel(void)
     adc = min;
   }
 
-  // calculate batt percent
-  wpr_battPercent = (u8)((adc - min) * 100 / (max - min));
+  // calculate batt percent(rounding)
+  wpr_battPercent = (u8)(((adc - min) * 100 + (div >> 1)) / div);
   /*
     Calculate batt value(unit: mV):
 
@@ -194,6 +188,11 @@ static bool wpr_configStwlc38(void)
   u8 buf[64];
   u8 *p = buf;
   u8 size;
+
+  // chip power on
+  HAL_GPIO_WritePin(PIN30_PA9_WLC38_ON_GPIO_Port, PIN30_PA9_WLC38_ON_Pin, GPIO_PIN_RESET);
+  // delay for enable chip
+  HAL_Delay(2);
 
   // enable chip
   HAL_GPIO_WritePin(CCM_PIN21_BOOST_ON_GPIO_Port, CCM_PIN21_BOOST_ON_Pin, GPIO_PIN_RESET);
@@ -294,8 +293,14 @@ static void wpr_smCharging(void)
   if(wpr_chargeSwitch == wpr_chargeSwitch_off
     || wpr_isFullCharging()){
 
-
     wpr_chargeSwitch = wpr_chargeSwitch_off;
+
+    // chip power off
+    HAL_GPIO_WritePin(PIN30_PA9_WLC38_ON_GPIO_Port, PIN30_PA9_WLC38_ON_Pin, GPIO_PIN_SET);
+
+    // reset RSL10(RSL10 enter into NoSleepMode, wakeup it to 30 second LPM)
+    ble_resetRSL10();
+
     // stop charge
     wpr_status = wpr_stopCharge_status;
   }
@@ -329,6 +334,9 @@ static void wpr_smStartCharge(void)
 static void wpr_smWaiting(void)
 {
   if(wpr_chargeSwitch == wpr_chargeSwitch_on){
+    // chip power on
+    HAL_GPIO_WritePin(PIN30_PA9_WLC38_ON_GPIO_Port, PIN30_PA9_WLC38_ON_Pin, GPIO_PIN_RESET);
+
     wpr_status = wpr_startCharge_status;
   }
 }
@@ -348,6 +356,10 @@ static void wpr_smStartup(void)
   wpr_battUpdateTick = HAL_GetTick() + TIMEOUT_100MS;
   // enter into next status
   wpr_status = wpr_Waiting_status;
+
+#ifndef LiuJH_DEBUG
+  buftick = HAL_GetTick() + TIMEOUT_800MS;
+#endif
 }
 
 /* public function define *******************************************/
@@ -397,9 +409,15 @@ void wpr_adcConvCpltCB(void)
   // get adc sample value
   wpr_adcValue = (int32_t)(HAL_ADC_GetValue(&hadc) & 0x0FFF);
 #ifndef LiuJH_DEBUG
-  if(adclen < 32)
+  // wait the adc value is stable
+  if(HAL_GetTick() < buftick) return;
+
+  // record data
+  if(adclen < sizeof(adcbuf))
     adcbuf[adclen++] = wpr_adcValue;
-  if(adclen >= 32){
+
+  // debug break point only
+  if(adclen >= sizeof(adcbuf)){
     int i = 0;
     i++;
   }
@@ -457,15 +475,14 @@ void wpr_shutdown(void)
   // pull high pin21 boost on, let stwlc38 into reset mode
   HAL_GPIO_WritePin(CCM_PIN21_BOOST_ON_GPIO_Port, CCM_PIN21_BOOST_ON_Pin, GPIO_PIN_SET);
 
-  // other work???
-
-
-
   // update status
   wprIsWorking = false;
 
   // update status for LPM
   wpr_status = wpr_idle_status;
+
+  // chip power off
+  HAL_GPIO_WritePin(PIN30_PA9_WLC38_ON_GPIO_Port, PIN30_PA9_WLC38_ON_Pin, GPIO_PIN_SET);
 }
 
 u8 wpr_getAdcChNum(void)

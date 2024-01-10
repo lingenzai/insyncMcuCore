@@ -21,25 +21,17 @@
 // full charged battery value
 #define WPR_BATT_HIGH_THRESHOLD         4200
 
+
 /* adc max value(corresponding 4.2V, it is max voltage of ccm project) */
-// PIN21(Boost on) Enable
-#define WPR_ADC_MAX_VALUE_E             1981
-// PIN21(Boost on) Disable
-#define WPR_ADC_MAX_VALUE_D             2824  // 1998
+#define WPR_ADC_MAX_VALUE               2838
+
 // adc value of 4.1V
-//#define WPR_ADC_HIGH_VALUE              2740
+//#define WPR_ADC_HIGH_VALUE              2768
 // adc value of 3.1V
-//#define WPR_ADC_LOW_VALUE               2065
+//#define WPR_ADC_LOW_VALUE               2094
+
 /* adc min value(corresponding 3.0V, it is min voltage of ccm project) */
-// PIN21(Boost on) Enable
-#define WPR_ADC_MIN_VALUE_E             1794
-// PIN21(Boost on) Disable
-#define WPR_ADC_MIN_VALUE_D             2019  // 1799
-/* weight for percent(max value - min value) */
-// PIN21(Boost on) Enable (1981 - 1794 = 187)
-//#define WPR_ADC_PERCENT_DIV_E           100 / 187
-// PIN21(Boost on) Disable (1998 - 1799 = 199)
-//#define WPR_ADC_PERCENT_DIV_D           100 / 199
+#define WPR_ADC_MIN_VALUE               2026
 
 
 // I2C device address of STWLC38

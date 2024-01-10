@@ -226,6 +226,7 @@ static void pulse_smWaitingProc(void)
 
   /* NOW: we can check pulsing switch and flag */
 
+  if(fpulse_isWorking()) return;
 
   // if ble is working, ble_pulsing switch is OFF?
   if(ble_isWorking() && !pulse_blePulsingOn)
@@ -282,6 +283,7 @@ static void pulse_smStartupProc(void)
 #endif
   // get tick(unit: ms)
   pulse_workOverTick = HAL_GetTick() + minutes * 60 * 1000;
+//  pulse_workOverTick = HAL_GetTick() + (minutes+60) * 60 * 1000;
 
   pulse_status = pulse_waiting_status;
 }
