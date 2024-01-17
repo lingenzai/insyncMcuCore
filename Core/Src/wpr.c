@@ -18,6 +18,7 @@ static u8 wpr_adcChNum = ADC_CH_NUM_BATT_MEASURE;
 
 // record bit12 adc sample value(NOTICE: update per 4ms)
 static u32 wpr_adcValue;
+static u32 wpr_adcCount;
 // adc value got freq
 static u32 wpr_battUpdateTick;
 // record battery value, unit: 0.1V
@@ -25,13 +26,14 @@ static u16 wpr_battValue;
 // reocrd battery percent, unit: 0.01
 static u8 wpr_battPercent;
 
+static bool wpr_valueIsUsing;
+
 // record start charge falg setting by ble
 static wpr_chargeSwitch_typeDef wpr_chargeSwitch;
 
 #ifndef LiuJH_DEBUG
-static u32 adcbuf[32];
-static u32 adclen;
-static u32 buftick;
+static u32 wpr_adcbuf[WPR_ADCBUF_SIZE];
+static u32 wpr_adclen;
 #endif
 
 
@@ -117,14 +119,27 @@ static bool wpr_writeRegsValues(u16 _startRegaddr, u8 *_pSrc, u32 _datalen)
     1. quickly get adc value;
     2. get wpr_battValue and wpr_battPercent;
 */
-static u16 wpr_calculateBattLevel(void)
+static void wpr_calculateBattLevel(void)
 {
-  u16 ret = 0;
-  u32 adc = wpr_adcValue;
+  static u32 adc = WPR_INVALID_VALUE;
   // adc max value(4.2V); adc min value(3.0V)
   u32 max = WPR_ADC_MAX_VALUE;
   u32 min = WPR_ADC_MIN_VALUE;
   u32 div = max - min;
+
+  // dont update, so dont calculate batt level
+  if(wpr_adcValue == adc
+    || (wpr_adcValue > adc && wpr_adcValue < adc + WPR_ADC_STEP)
+    || (wpr_adcValue < adc && wpr_adcValue + WPR_ADC_STEP > adc))
+    return;
+
+/*
+  if(wpr_adclen)
+    adc = wpr_adcbuf[wpr_adclen - 1];
+  else
+    adc = wpr_adcbuf[WPR_ADCBUF_SIZE - 1];
+*/
+  adc = wpr_adcValue;
 
   // over flow max or min adc value?
   if(adc > max){
@@ -135,40 +150,9 @@ static u16 wpr_calculateBattLevel(void)
 
   // calculate batt percent(rounding)
   wpr_battPercent = (u8)(((adc - min) * 100 + (div >> 1)) / div);
-  /*
-    Calculate batt value(unit: mV):
 
-      max V is 4.2V(ie. 4200mV), min V is 3.0V(ie. 3000mV);
-      percent = (battvalue - 3000) / (4200 - 3000) * 100
-              = (battvalue - 3000) / 12;
-
-      So, battvalue = percent * 12 + 3000;
-  */
+  // calculate battery value(4.2V and 3.0V)
   wpr_battValue = wpr_battPercent * 12 + 3000;
-
-  return ret;
-}
-
-/*
-  brief:
-    1. calculate and update battery level for other function using;
-    2. calculate and set percentage;
-    3. loop update value per minute;
-    4. NOTICE: get adc value immediately;
-*/
-static void wpr_updateBattLevel(void)
-{
-  if(!wprIsWorking || wpr_adcValue == WPR_INVALID_VALUE)
-    return;
-
-  if(HAL_GetTick() < wpr_battUpdateTick)
-    return;
-
-  // calculate battery value and percentage
-  wpr_calculateBattLevel();
-
-  // for next value
-  wpr_battUpdateTick = HAL_GetTick() + WPR_BATT_LEVEL_UPDATE_TICK;
 }
 
 /*
@@ -257,12 +241,7 @@ static bool wpr_configStwlc38(void)
 */
 static bool wpr_isFullCharging(void)
 {
-  bool ret = false;
-
-  if(wpr_battValue >= WPR_BATT_HIGH_THRESHOLD)
-    ret = true;
-
-  return ret;
+  return (wpr_battValue >= WPR_BATT_HIGH_THRESHOLD);
 }
 
 /*
@@ -299,7 +278,8 @@ static void wpr_smCharging(void)
     HAL_GPIO_WritePin(PIN30_PA9_WLC38_ON_GPIO_Port, PIN30_PA9_WLC38_ON_Pin, GPIO_PIN_SET);
 
     // reset RSL10(RSL10 enter into NoSleepMode, wakeup it to 30 second LPM)
-    ble_resetRSL10();
+    if(wpr_isFullCharging())
+      ble_resetRSL10();
 
     // stop charge
     wpr_status = wpr_stopCharge_status;
@@ -357,9 +337,6 @@ static void wpr_smStartup(void)
   // enter into next status
   wpr_status = wpr_Waiting_status;
 
-#ifndef LiuJH_DEBUG
-  buftick = HAL_GetTick() + TIMEOUT_800MS;
-#endif
 }
 
 /* public function define *******************************************/
@@ -394,8 +371,8 @@ void wpr_stateMachine(void)
       break;
   }
 
-  // calculate and update battery level for other function using
-  wpr_updateBattLevel();
+  wpr_calculateBattLevel();
+
 }
 
 /*
@@ -404,22 +381,32 @@ void wpr_stateMachine(void)
     2. record this data only, and process in state machine;
     3. 
 */
-void wpr_adcConvCpltCB(void)
+void wpr_adcConvCpltCB(u32 _adcvalue)
 {
-  // get adc sample value
-  wpr_adcValue = (int32_t)(HAL_ADC_GetValue(&hadc) & 0x0FFF);
+  wpr_adcCount++;
+
+  // first get value(delay 100ms)
+  if(!(wpr_adcValue ^ WPR_INVALID_VALUE)){
+    if(wpr_adcCount > WPR_BATT_UPDATE_COUNT1){
+      wpr_adcValue = _adcvalue;
+      wpr_adcCount = 0;
+    }
+  }else{
+    if(wpr_adcCount > WPR_BATT_UPDATE_COUNT){
+      wpr_adcValue = _adcvalue;
+      wpr_adcCount = 0;
+    }
+  }
+
 #ifndef LiuJH_DEBUG
-  // wait the adc value is stable
-  if(HAL_GetTick() < buftick) return;
-
-  // record data
-  if(adclen < sizeof(adcbuf))
-    adcbuf[adclen++] = wpr_adcValue;
-
-  // debug break point only
-  if(adclen >= sizeof(adcbuf)){
-    int i = 0;
-    i++;
+  // get and record adc value
+  if(!wpr_valueIsUsing){
+    // record data
+    if(wpr_adclen < WPR_ADCBUF_SIZE)
+      wpr_adcbuf[wpr_adclen++] = _adcvalue & 0x0FFF;
+    else
+      // debug break point only
+      wpr_adclen = 0;
   }
 #endif
 }
@@ -508,11 +495,16 @@ void wpr_init(void)
 {
   wprIsWorking = false;
   wpr_adcChNum = ADC_CH_NUM_BATT_MEASURE;
+//  wpr_adcChNum = ADC_CH_NUM_RA_RDET;
   wpr_adcValue = WPR_INVALID_VALUE;
-  wpr_battUpdateTick = WPR_INVALID_VALUE;
+  wpr_adcCount = 0;
+//  wpr_adctick = 0;
+  wpr_battUpdateTick = HAL_GetTick() + TIMEOUT_100MS;
   wpr_battValue = 0;
   wpr_battPercent = 0;
   wpr_chargeSwitch = wpr_chargeSwitch_off;
+
+  wpr_valueIsUsing = false;
 
   wpr_status = wpr_inited_status;
 }

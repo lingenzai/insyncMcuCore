@@ -28,12 +28,12 @@
 #define TIMEOUT_100MS           100
 #define TIMEOUT_150MS           150
 #define TIMEOUT_180MS           180
-/*
+///*
 #define TIMEOUT_200MS           200
 #define TIMEOUT_350MS           350
 #define TIMEOUT_500MS           500
 #define TIMEOUT_600MS           600
-*/
+//*/
 #define TIMEOUT_800MS           800
 #define TIMEOUT_1S              1000
 #define TIMEOUT_2S              2000
@@ -143,6 +143,7 @@ extern ADC_HandleTypeDef hadc;
 extern RTC_HandleTypeDef hrtc;
 extern I2C_HandleTypeDef hi2c1;
 //extern WWDG_HandleTypeDef hwwdg;
+extern TIM_HandleTypeDef htim6;
 
 extern mcu_resetFlag_typeDef mcu_rstFlag;
 extern RTC_DateTypeDef mcu_date;

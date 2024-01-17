@@ -76,8 +76,6 @@ extern void main_adcConfigAllCh(void);
 /* Private defines -----------------------------------------------------------*/
 #define CCM_PIN10_WKUP_INTR_Pin GPIO_PIN_0
 #define CCM_PIN10_WKUP_INTR_GPIO_Port GPIOA
-#define CCM_PIN12_RA_IEGM_Pin GPIO_PIN_2
-#define CCM_PIN12_RA_IEGM_GPIO_Port GPIOA
 #define CCM_PIN13_RS_RDET_Pin GPIO_PIN_3
 #define CCM_PIN13_RS_RDET_GPIO_Port GPIOA
 #define CCM_PIN14_RS_IEGM_Pin GPIO_PIN_4
@@ -86,8 +84,6 @@ extern void main_adcConfigAllCh(void);
 #define CCM_PIN15_RV_RDET_GPIO_Port GPIOA
 #define CCM_PIN16_RV_IEGM_Pin GPIO_PIN_6
 #define CCM_PIN16_RV_IEGM_GPIO_Port GPIOA
-#define CCM_PIN17_BATT_M_Pin GPIO_PIN_7
-#define CCM_PIN17_BATT_M_GPIO_Port GPIOA
 #define CCM_PIN18_RSL10_RST_Pin GPIO_PIN_0
 #define CCM_PIN18_RSL10_RST_GPIO_Port GPIOB
 #define CCM_PIN21_BOOST_ON_Pin GPIO_PIN_10

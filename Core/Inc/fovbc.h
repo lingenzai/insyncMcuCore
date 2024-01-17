@@ -8,6 +8,7 @@
 #ifndef INC_FOVBC_H_
 #define INC_FOVBC_H_
 
+
 /* force pulse width */
 // 0.1ms(unit: 10us)
 #define FOVBC_PULSE_WIDTH_MIN           10
@@ -19,6 +20,11 @@
 
 // count default(2 / 16.384 = 0.12ms)
 #define FOVBC_PULSE_DEFAULT_COUNT       2
+// FOVBC_200HZ_COUNT - FOVBC_PULSE_DEFAULT_COUNT * 2
+#define FOVBC_PULSE_DELAY_DEFAULT_COUNT 78
+
+// OVBC_CHIP_ENABLE_TIME * OVBC_RTC_WKUP_COUNT_UNIT = 245.76
+#define OVBC_CHIP_EBABLE_COUNT          246
 
 
 typedef enum{

@@ -15,6 +15,8 @@ static fovbc_status_typeDef fovbc_status;
 static bool fovbcIsWorking;
 // fovbc pulse width
 static u32 fovbc_pulseCount = FOVBC_PULSE_DEFAULT_COUNT;
+// delay = (5 - 0.1 * 2) * 16.384 = 
+static u32 fovbc_pulseDelay = FOVBC_PULSE_DELAY_DEFAULT_COUNT;
 
 
 /* private function define ******************************************/
@@ -38,7 +40,7 @@ static void fovbc_smPulsingLoop(void)
   fovbc_status = fovbc_VposEn_status;
 
   // start RTC timer
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, (FOVBC_200HZ_COUNT - fovbc_pulseCount * 2), RTC_WAKEUPCLOCK_RTCCLK_DIV2);
+  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, fovbc_pulseDelay, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
 }
 
 /*
@@ -60,8 +62,13 @@ static void fovbc_smVnegEn(void)
   // set VposEn pin
   HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_SET);
 
+#ifdef LiuJH_DEBUG
+    // start TIM6 timer
+    HAL_TIM_Base_Start_IT(&htim6);
+#else
   // start RTC timer
   HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, fovbc_pulseCount, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
+#endif
 }
 
 /*
@@ -83,8 +90,13 @@ static void fovbc_smVposEn(void)
   // set VposEn pin
   HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_SET);
 
+#ifdef LiuJH_DEBUG
+  // start TIM6 timer
+  HAL_TIM_Base_Start_IT(&htim6);
+#else
   // start RTC timer
   HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, fovbc_pulseCount, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
+#endif
 }
 
 /*
@@ -95,19 +107,14 @@ static void fovbc_smVposEn(void)
 */
 static void fovbc_smChipEnable(void)
 {
-  u32 count;
-
   // Enable chip TI-TPS61096A(pin set)
   HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_SET);
-
-  // set rtc timer for next job: VposEn
-  count = OVBC_CHIP_ENABLE_TIME * OVBC_RTC_WKUP_COUNT_UNIT;
 
   // update status
   fovbc_status = fovbc_VposEn_status;
 
   // start RTC timer
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, count, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
+  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, OVBC_CHIP_EBABLE_COUNT, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
 }
 
 /*
@@ -167,12 +174,34 @@ void fovbc_stateMachine(void)
   }
 }
 
+
+/**
+  * @brief  Period elapsed callback in non-blocking mode
+  * @param  htim TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+#ifdef LiuJH_DEBUG
+  HAL_TIM_Base_Stop_IT(&htim6);
+#endif
+  fovbc_stateMachine();
+}
+
+
 /*
   brief:
     1. when ble or pulse shut down, we will shut down;
 */
 void fovbc_shutdown(void)
 {
+  // update status for LPM
+  fovbc_status = fovbc_idle_status;
+  
+#ifdef LiuJH_DEBUG
+  HAL_TIM_Base_Stop_IT(&htim6);
+#endif
+
   // disable RTC timer
   HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
 
@@ -185,9 +214,6 @@ void fovbc_shutdown(void)
 
   // update status
   fovbcIsWorking = false;
-
-  // update status for LPM
-  fovbc_status = fovbc_idle_status;
 
   // switch OFF chip
   HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_RESET);
@@ -204,8 +230,13 @@ void fovbc_startup(void)
   fovbc_init();
   fovbcIsWorking = true;
 
+#ifdef LiuJH_DEBUG
+  // update status
+  fovbc_status = fovbc_chipEnable_status;
+#else
   // update status
   fovbc_status = fovbc_startup_status;
+#endif
 
   // start state machine
   fovbc_stateMachine();
@@ -231,13 +262,32 @@ void fovbc_setPulseWidth(u8 _width)
   else
     fovbc_pulseCount = _width;
 
+#ifdef LiuJH_DEBUG
+  // Using RTC timer as delay timer
+  fovbc_pulseDelay = FOVBC_200HZ_COUNT - (fovbc_pulseCount << 10) / 3125 - 5;
+
+  /*
+    For TIM6:
+      1. clock is 2097KHz; div is 1; so counter is 2097 per 1 ms;
+      2. So counter is: _width * 2097 / 100;
+  */
+  if(fovbc_pulseCount == FOVBC_PULSE_WIDTH_MAX)
+//    fovbc_pulseCount = fovbc_pulseCount * 2097 / 100;
+    fovbc_pulseCount = 2097;
+  else{
+    fovbc_pulseCount = 30;
+    fovbc_pulseDelay = 65;
+  }
+
+  // reinit tim6
+  htim6.Init.Period = fovbc_pulseCount;
+  HAL_TIM_Base_Init(&htim6);
+#else
   // set counter(rounding)
   fovbc_pulseCount = ((fovbc_pulseCount << 10) + 3125) / 6250;
-/*
-  fovbc_pulseCount *= OVBC_RTC_WKUP_COUNT_UNIT;
-  fovbc_pulseCount += FOVBC_PULSE_WIDTH_STEP;
-  fovbc_pulseCount /= FOVBC_PULSE_WIDTH_UNIT;
-*/
+
+  fovbc_pulseDelay = FOVBC_200HZ_COUNT - (fovbc_pulseCount << 1);
+#endif
 }
 
 /*

@@ -288,7 +288,9 @@ static void ecg_init2(void)
 static void ecg_cbSmRnDetect(u8 _data)
 {
   u32 detectmin, detectmax;
-  static u8 prevdata = 0;
+  // prevdata2, prevdata1, _data is the time line adc data
+  // _data is current data
+  static u8 prevd1 = 0, prevd2 = 0;
   static u32 tick = 0;
 
 #ifdef LiuJH_DEBUG
@@ -305,7 +307,8 @@ static void ecg_cbSmRnDetect(u8 _data)
   // have enough data? need detecting?
   if(ecg_RsDetected <= detectmin){
     // The first point of Rn move window, rocord it, dont need detect
-    prevdata = _data;
+    prevd2 = prevd1;
+    prevd1 = _data;
     tick = HAL_GetTick();
 
     // dont need checking, skip it
@@ -334,15 +337,15 @@ static void ecg_cbSmRnDetect(u8 _data)
 
   /*
     NOW:
-      1. We have two data in [RRi-3, RRi+4];
+      1. We have eight data in [RRi-3, RRi+4];
       2. Compare prev data and current data;
       3. if exist inflection, the prev data is Rn peak point;
   */
 
-  // check the inflection and the point value
-  if(_data < prevdata && prevdata > ecg_RsValueV){
+  // check the inflection and the peak point value
+  if(prevd1 > ecg_RsValueV && prevd1 > _data && prevd1 > prevd2){
     // update R value and R value V
-    ecg_RsValue = (ecg_RsValue + prevdata) >> 1;
+    ecg_RsValue = (ecg_RsValue + prevd1) >> 1;
     ecg_RsValueV = ecg_RsValue * ECG_R_VALUE_WEIGHT;
     // record current R peak point tick value for pulse
     ecg_RsTick = tick;
@@ -372,7 +375,8 @@ static void ecg_cbSmRnDetect(u8 _data)
 
   }  else{
     // update prev data for next compare
-    prevdata = _data;
+    prevd2 = prevd1;
+    prevd1 = _data;
     tick = HAL_GetTick();
   }
 
@@ -402,8 +406,13 @@ static void ecg_smRnWaiting2(void)
   if(ecg_RRviTime)
     ecg_RvBpm = 60 * 1000 / ecg_RRviTime;
 
-  // check bpm is qual
-  if(ecg_RsBpm != ecg_RvBpm){
+  // check bpm is equal
+//  if(ecg_RsBpm != ecg_RvBpm){
+  // check RR point is equal or sub is 1
+  if(ecg_RRsiPoint != ecg_RRviPoint
+    && ecg_RRsiPoint != ecg_RRviPoint + 1
+    && ecg_RRsiPoint != ecg_RRviPoint - 1){
+
     // restart detect both of Rs and Rv channel
     ecg_status = ecg_startup_status;
 
@@ -631,6 +640,16 @@ static void ecg_smR1Detect(void)
 
   /*
     NOW:
+      1. redo R1 detect if the slopeV < ECG_SLOPEV_DEFAULT;
+  */
+  if(ecg_RsSlopeV < ECG_SLOPEV_DEFAULT || ecg_RvSlopeV < ECG_SLOPEV_DEFAULT){
+    // redo R detect, restart up ecg detection
+    ecg_status = ecg_startup_status;
+    return;
+  }
+
+  /*
+    NOW:
       1. R1 detect status process finished.
       2. Ignore points of the left of R1 peak point;
       3. init for next status(skip 180 ms from R1, and then start find R2);
@@ -835,6 +854,9 @@ void ecg_adcConvCpltCB(u8 _curCh)
 {
   i32 value;
   u8 byte;
+
+  if((_curCh ^ ADC_CH_NUM_RS_RDET) && (_curCh ^ ADC_CH_NUM_RV_RDET))
+    return;
 
   // get adc sample value
   value = (int32_t)(HAL_ADC_GetValue(&hadc) & 0x0FFF);

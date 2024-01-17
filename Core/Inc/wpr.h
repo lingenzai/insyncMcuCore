@@ -12,12 +12,21 @@
 /* macro define *****************************************************/
 
 // battery level update time(unit: ms)
-#define WPR_BATT_LEVEL_UPDATE_TICK      TIMEOUT_20S //  60000 // 60S
+#define WPR_BATT_LEVEL_UPDATE_TICK      TIMEOUT_5S //  60000 // 60S
+/*
+  We sample 6 channels, so interval time is 4ms per point
+  WPR_BATT_LEVEL_UPDATE_TICK / 4 = 1250
+*/
+#define WPR_BATT_UPDATE_COUNT           1250
+// first sample time is 100ms
+#define WPR_BATT_UPDATE_COUNT1          25
 
 #define WPR_INVALID_VALUE               (-1)
 
+#define WPR_ADCBUF_SIZE                 32
+
 // ultra low battery value
-#define WPR_BATT_LOW_THRESHOLD          3100
+#define WPR_BATT_LOW_THRESHOLD          3100  // 35% * 12 + 3000 = 3420  // 3100
 // full charged battery value
 #define WPR_BATT_HIGH_THRESHOLD         4200
 
@@ -32,6 +41,8 @@
 
 /* adc min value(corresponding 3.0V, it is min voltage of ccm project) */
 #define WPR_ADC_MIN_VALUE               2026
+// 
+#define WPR_ADC_STEP                    (WPR_ADC_MAX_VALUE - WPR_ADC_MIN_VALUE) / 100
 
 
 // I2C device address of STWLC38
@@ -167,7 +178,7 @@ typedef enum {
 
 /* export function **************************************************/
 
-extern void wpr_adcConvCpltCB(void);
+extern void wpr_adcConvCpltCB(u32 _adcvalue);
 extern void wpr_stateMachine(void);
 extern void wpr_init(void);
 extern void wpr_startup(void);

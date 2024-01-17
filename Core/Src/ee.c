@@ -175,38 +175,48 @@ bool ee_restoreKeyValue(void)
         param1: pulseConfig;
         param2: 
 */
-bool ee_storeKeyValue(void)
+bool ee_storeKeyValue(ee_keyvalue_typeDef _key)
 {
   u32 addr;
   u8 *pdata;
   u32 len;
   bool ret = true;
 
-  // Param1: pulseConfig
-  addr = ee_addr_pulseConfig;
-  pdata = (u8 *)pulse_getConfig();
-  len = ee_addr_pulseConfig_size;
+  switch(_key){
+    case ee_kv_pulseConfig:
+      // Param1: pulseConfig
+      addr = ee_addr_pulseConfig;
+      pdata = (u8 *)pulse_getConfig();
+      len = ee_addr_pulseConfig_size;
+      break;
+    case ee_kv_unpulsingPeriod:
+      // Param2: unpulsing period
+      addr = ee_addr_unpulsingPeriod;
+      pdata = (u8 *)pulse_getUnpulsingPeriod();
+      len = ee_addr_unpulsingPeriod_size;
+      break;
+    case ee_kv_VoutSet:
+      // Param3: pulse Vout_set config value
+      addr = ee_addr_VoutSet;
+      pdata = (u8 *)mcu_getVoutset();
+      len = ee_addr_VoutSet_size;
+      break;
+    case ee_kv_motionPeriod:
+      // Param4: motion period redo config
+      addr = ee_addr_motionPeriod;
+      pdata = (u8 *)mcu_getMotionCfg();
+      len = ee_addr_motionPeriod_size;
+      break;
+
+
+    default:
+      break;
+  }
+
   ee_writeData(addr, pdata, len);
+
   // the last data write time delay, need it???
-
-  // Param2: unpulsing period
-  addr = ee_addr_unpulsingPeriod;
-  pdata = (u8 *)pulse_getUnpulsingPeriod();
-  len = ee_addr_unpulsingPeriod_size;
-  ee_writeData(addr, pdata, len);
-
-  // Param3: pulse Vout_set config value
-  addr = ee_addr_VoutSet;
-  pdata = (u8 *)mcu_getVoutset();
-  len = ee_addr_VoutSet_size;
-  ee_writeData(addr, pdata, len);
-
-  // Param4: motion period redo config
-  addr = ee_addr_motionPeriod;
-  pdata = (u8 *)mcu_getMotionCfg();
-  len = ee_addr_motionPeriod_size;
-  ee_writeData(addr, pdata, len);
-
+  HAL_Delay(2);
 
   return ret;
 }

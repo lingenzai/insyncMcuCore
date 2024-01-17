@@ -48,7 +48,7 @@
 #define ECG_R2_MW_SIZE              6
 
 // define slope default value
-#define ECG_SLOPE_DEFAULT           40
+#define ECG_SLOPEV_DEFAULT          15
 // slope step(get ONE slope per four points)
 #define ECG_SLOPE_STEP              3
 // we will get four slopes left R1 and right R1
@@ -58,8 +58,8 @@
 // use 0.85 as R value weight
 #define ECG_R_VALUE_WEIGHT          17 / 20
 
-// Rn move window size
-#define ECG_Rn_MW_HALF_SIZE         4 // 2
+// Rn half of move window size
+#define ECG_Rn_MW_HALF_SIZE         3 // 2  // 4 // 
 // 4 + 1 + 4, guess Rn peak point is in middle of these points
 //#define ECG_Rn_MW_SIZE              (ECG_Rn_MW_HALF_SIZE * 2 + 1) // 9
 // if Rw escape, Rw size will update

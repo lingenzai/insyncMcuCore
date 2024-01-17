@@ -331,6 +331,9 @@ static void ble_reqWriteAccelCfg(u8 _reqId)
 
   // response RSL10
   ble_respUserReqOkOrErr(_reqId, true);
+
+  // store this key value into EEPROM
+  ee_storeKeyValue(ee_kv_motionPeriod);
 }
 
 /*
@@ -410,6 +413,9 @@ static void ble_reqWritePulseHolidayDt(u8 _reqId)
 
   // response RSL10
   ble_respUserReqOkOrErr(_reqId, true);
+
+  // store this key value into EEPROM
+  ee_storeKeyValue(ee_kv_unpulsingPeriod);
 }
 
 /*
@@ -483,6 +489,9 @@ static void ble_reqWritePulseVoutSetStatus(u8 _reqId)
   }
 
   ble_respUserReqOkOrErr(_reqId, isOK);
+
+  // store this key value into EEPROM
+  ee_storeKeyValue(ee_kv_VoutSet);
 }
 
 /*
@@ -727,6 +736,9 @@ static void ble_reqWritePulseConfig(u8 _reqId)
 
   // response RSL10
   ble_respUserReqOkOrErr(_reqId, true);
+
+  // store this key value into EEPROM
+  ee_storeKeyValue(ee_kv_pulseConfig);
 }
 
 /*
@@ -852,7 +864,7 @@ static void ble_dealReqCommand(void)
     // rsl10 told mcu: its status is FOTA with APP(0x61)
     case ble_p_rsl10IsFota:
       // store some important value into spi flash;
-      ee_storeKeyValue();
+//      ee_storeKeyValue();
       // told RSL10 OK
       ble_respUserReqOkOrErr(reqid, true);
       ble_status = ble_reqFota_status;
@@ -1019,12 +1031,12 @@ static void ble_dealReqCommand(void)
       // rsl10 is idle, continue query, status dont change
       break;
 */
-/*
+///*
     // rsl10 told mcu: its status is connected with APP(0x62)
     case ble_p_rsl10IsConnected:
         // igore this reply of rsl10
         break;
-*/
+//*/
     // rsl10 response mcu's sleep notify(0x63)
     case ble_p_rsl10AgreeEnterLpm:
       // we will enter LPM
@@ -1053,8 +1065,7 @@ static bool ble_commandNeedDeal(void)
   if(*prx != BLE_P_HEAD) goto error;
 
   // command code is idle or connected(ble_p_rsl10IsIdle, ble_p_rsl10IsConnected)?
-  if(prx[BLE_P_COMMAND_INDEX] == ble_p_rsl10IsIdle
-    || prx[BLE_P_COMMAND_INDEX] == ble_p_rsl10IsConnected)
+  if(prx[BLE_P_COMMAND_INDEX] == ble_p_rsl10IsIdle)
     goto error;
 
   // check sum is correct
@@ -1301,7 +1312,7 @@ static void ble_smReqWaiting(void)
   // still in this status? query loop continue
   if(ble_status == ble_reqWaiting_status){
 
-#ifdef LiuJH_DEBUG // only test: dont sleep
+#ifndef LiuJH_DEBUG // only test: dont sleep
     // current status is timeout?
     if(HAL_GetTick() > ble_timeoutTick){
       // loop in this status if we are charging

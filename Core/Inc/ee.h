@@ -46,10 +46,19 @@
 
 /* type define ----------------------------------------------------------- */
 
+typedef enum{
+  ee_kv_pulseConfig,
+  ee_kv_unpulsingPeriod,
+  ee_kv_VoutSet,
+  ee_kv_motionPeriod,
+
+
+  ee_kv_max
+} ee_keyvalue_typeDef;
 
 
 /* extern public function ------------------------------------------------- */
 extern bool ee_restoreKeyValue(void);
-extern bool ee_storeKeyValue(void);
+extern bool ee_storeKeyValue(ee_keyvalue_typeDef _key);
 
 #endif /* INC_EE_H_ */

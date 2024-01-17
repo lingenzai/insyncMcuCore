@@ -95,26 +95,29 @@ static void adc_smStartup(void)
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
   /* check channel num, toast ecg or ble or igore */
-
+#ifndef LiuJH_DEBUG
+#else
   // is ecg channel data?
-  if(ecg_isEcgAdcCh(adc_curChNum)){
+//  if(ecg_isEcgAdcCh(adc_curChNum)){
     ecg_adcConvCpltCB(adc_curChNum);
-  }
+//  }
 
   // is ble channel data?
   if(ble_isBleAdcCh(adc_curChNum)){
     ble_adcConvCpltCB();
   }
+#endif
 
+ /*
   // is flash store twin1 or twin2?
   if(flash_isAdcStoreCh(adc_curChNum)){
     flash_adcConvCplCB(adc_curChNum);
   }
-
+*/
 
   // is batt measurement data?
   if(!(adc_curChNum ^ wpr_getAdcChNum())){
-    wpr_adcConvCpltCB();
+    wpr_adcConvCpltCB(HAL_ADC_GetValue(hadc));
   }
 
   // others channel data will ignore

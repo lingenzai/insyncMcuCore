@@ -31,7 +31,9 @@ static u32 pulse_workOverTick;
 static bool pulse_ecgPulsingOn;
 
 // APP ask pulse ON/OFF(default: OFF)
-bool pulse_blePulsingOn;
+static bool pulse_blePulsingOn;
+
+static u32 pulse_BattCheckTick;
 
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private var define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
@@ -158,6 +160,19 @@ static bool pulse_isUltraBattLevel(void)
 }
 
 /*
+*/
+static void pulse_enterLpm(void)
+{
+  // make sure ovbc is shut down
+  ovbc_shutdown();
+  // make sure wpr is shut down
+  wpr_shutdown();
+  
+  // stop work and go into idle(we can LPM)
+  pulse_status = pulse_idle_status;
+}
+
+/*
   brief:
     1. ble working time is over or pulse working time is over;
     2. 
@@ -210,15 +225,10 @@ static void pulse_smWaitingProc(void)
 {
   // ble working time is over or pulse working time is over?
   // if only pulse is working, check batt
-  if(pulse_workTimeIsOver()
-    || pulse_isUltraBattLevel()){
-    // make sure ovbc is shut down
-    ovbc_shutdown();
-    // make sure wpr is shut down
-    wpr_shutdown();
+  if(pulse_workTimeIsOver() || pulse_isUltraBattLevel()){
 
-    // stop work and go into idle(we can LPM)
-    pulse_status = pulse_idle_status;
+    // enter standby mode
+    pulse_enterLpm();
 
     // mcu will startup LPM working
     return;
@@ -285,6 +295,7 @@ static void pulse_smStartupProc(void)
   pulse_workOverTick = HAL_GetTick() + minutes * 60 * 1000;
 //  pulse_workOverTick = HAL_GetTick() + (minutes+60) * 60 * 1000;
 
+  pulse_BattCheckTick = HAL_GetTick() + TIMEOUT_350MS;
   pulse_status = pulse_waiting_status;
 }
 

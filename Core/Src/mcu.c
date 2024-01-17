@@ -30,13 +30,17 @@ Data Format:
 static mcu_Voutset_typeDef mcu_Voutset;
 
 
+
+static u32 mcu_tick = 0;
+
+
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private var define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
 
 
 
 /*^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ private function define start ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^*/
 
-static void mcu_enterStandbyMode(void);
+//static void mcu_enterStandbyMode(void);
 
 
 /*
@@ -243,7 +247,7 @@ static void mcu_workDriven(void)
 */
 static void mcu_storeKeyValue(void)
 {
-  ee_storeKeyValue();
+//  ee_storeKeyValue();
 }
 
 /*
@@ -266,7 +270,7 @@ static void mcu_setGpioFloatingInput(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   // keep PA13 and PA14 for debugging, and keep PA0 for wakeup;
-  GPIO_InitStruct.Pin = GPIO_PIN_All & (~CCM_PIN10_WKUP_INTR_Pin) & (~PIN30_PA9_WLC38_ON_Pin) & (~GPIO_PIN_13) & (~GPIO_PIN_14);
+  GPIO_InitStruct.Pin = GPIO_PIN_All & (~CCM_PIN10_WKUP_INTR_Pin) & (~GPIO_PIN_13) & (~GPIO_PIN_14) & (~PIN30_PA9_WLC38_ON_Pin);
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   // this pin MUST set, otherwise STWLC38 is very consume power
@@ -303,7 +307,7 @@ static void mcu_setLpmWakeupTimer(void)
   startsec = pulse_getConfig()->pulse_start_time * 60;
 
   // compare these, make sure wakeup time
-  if(sec > startsec)
+  if(sec >= startsec)
     startsec += MCU_MAX_SECOND_EACH_DAY;
   sec = startsec - sec;
 
@@ -524,6 +528,8 @@ void HAL_WWDG_EarlyWakeupCallback(WWDG_HandleTypeDef *hwwdg)
 */
 void mcu_allStateMachine(void)
 {
+  u32 tick = HAL_GetTick();
+
   // ble(RSL10) state machine
   ble_stateMachine();
 
@@ -555,6 +561,9 @@ void mcu_allStateMachine(void)
   if(mcu_noDeviceWorking()){
     mcu_enterStandbyMode();
   }
+
+  tick = HAL_GetTick() - tick;
+  if(tick > mcu_tick) mcu_tick = tick;
 }
 
 
@@ -694,9 +703,10 @@ void mcu_deviceInit(void)
   // init fpulse and fovbc
   fpulse_init();
 
-#ifndef LiuJH_DEBUG
+#ifdef LiuJH_DEBUG
   // test only(run this statement, code will fly......)
-  HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_SET);
+//  HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_SET);
+//  HAL_GPIO_WritePin(PIN30_PA9_WLC38_ON_GPIO_Port, PIN30_PA9_WLC38_ON_Pin, GPIO_PIN_RESET);
 #endif
 }
 
