@@ -8,6 +8,8 @@
 #ifndef INC_FOVBC_H_
 #define INC_FOVBC_H_
 
+#define LiuJH_NOTE
+
 
 /* force pulse width */
 // 0.1ms(unit: 10us)
@@ -63,6 +65,7 @@ extern void fovbc_startup(void);
 extern void fovbc_shutdown(void);
 extern void fovbc_stateMachine(void);
 extern void fovbc_setPulseWidth(u8 _width);
+extern void fovbc_TIM6_periodElapsedCB(TIM_HandleTypeDef *htim);
 
 
 #endif /* INC_FOVBC_H_ */

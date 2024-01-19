@@ -33,7 +33,6 @@ static bool pulse_ecgPulsingOn;
 // APP ask pulse ON/OFF(default: OFF)
 static bool pulse_blePulsingOn;
 
-static u32 pulse_BattCheckTick;
 
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private var define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
@@ -295,7 +294,6 @@ static void pulse_smStartupProc(void)
   pulse_workOverTick = HAL_GetTick() + minutes * 60 * 1000;
 //  pulse_workOverTick = HAL_GetTick() + (minutes+60) * 60 * 1000;
 
-  pulse_BattCheckTick = HAL_GetTick() + TIMEOUT_350MS;
   pulse_status = pulse_waiting_status;
 }
 

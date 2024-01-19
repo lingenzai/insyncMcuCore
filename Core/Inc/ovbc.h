@@ -56,6 +56,7 @@ extern void ovbc_init(void);
 extern bool ovbc_isWorking(void);
 extern void ovbc_startup(void);
 extern void ovbc_shutdown(void);
+extern void ovbc_stateMachine(void);
 
 
 

@@ -220,10 +220,13 @@ static bool mcu_noDeviceWorking(void)
 static void mcu_workDriven(void)
 {
   // check ble and pulse is all stop working?
-  if(!ble_isWorking() && !pulse_isWorking()){
+  if(!ble_isWorking() && !pulse_isWorking() && !fovbc_isWorking()){
     // stop adc and ecg and accel working
     adc_stop();
     accel_stop();
+
+    // stop my tick
+    HAL_TIM_Base_Stop_IT(&htim21);
 
     return;
   }
@@ -361,6 +364,9 @@ static void mcu_enterStandbyMode(void)
 
 static void mcu_init(void)
 {
+  // start my sysTick
+  HAL_TIM_Base_Start_IT(&htim21);
+
   // restore mcu date and time
   mcu_restoreDatetime();
 
@@ -499,6 +505,20 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 
 /*
   brief:
+    1. Wakeup Timer callback;
+    2. 
+*/
+void mcu_RtcTimerWkupCB(RTC_HandleTypeDef *hrtc)
+{
+  if(fovbc_isWorking())
+    fovbc_stateMachine();
+  else if(ovbc_isWorking())
+    ovbc_stateMachine();
+}
+
+
+/*
+  brief:
     1. spi status is idle;
     2. when spi TxRx or Tx or Rx working finished, enter into idle status;
     3. others device can use spi device when spi is idle;
@@ -528,8 +548,6 @@ void HAL_WWDG_EarlyWakeupCallback(WWDG_HandleTypeDef *hwwdg)
 */
 void mcu_allStateMachine(void)
 {
-  u32 tick = HAL_GetTick();
-
   // ble(RSL10) state machine
   ble_stateMachine();
 
@@ -561,9 +579,6 @@ void mcu_allStateMachine(void)
   if(mcu_noDeviceWorking()){
     mcu_enterStandbyMode();
   }
-
-  tick = HAL_GetTick() - tick;
-  if(tick > mcu_tick) mcu_tick = tick;
 }
 
 
@@ -763,6 +778,23 @@ void mcu_sysInit(void)
   // 2. 
 
 }
+
+void mcu_incTick(void)
+{
+  mcu_tick++;
+}
+
+/**
+  * @brief Provides a tick value in millisecond.
+  * @note This function is declared as __weak to be overwritten in case of other
+  *       implementations in user file.
+  * @retval tick value
+  */
+uint32_t HAL_GetTick(void)
+{
+  return mcu_tick;
+}
+
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv public function define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
 

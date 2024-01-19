@@ -18,6 +18,8 @@ static u32 fovbc_pulseCount = FOVBC_PULSE_DEFAULT_COUNT;
 // delay = (5 - 0.1 * 2) * 16.384 = 
 static u32 fovbc_pulseDelay = FOVBC_PULSE_DELAY_DEFAULT_COUNT;
 
+static u32 fovbc_loopCount;
+
 
 /* private function define ******************************************/
 
@@ -32,15 +34,29 @@ static void fovbc_smVposEn(void);
 */
 static void fovbc_smPulsingLoop(void)
 {
-  // reset VposEn and VnegEn pin
-  HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
-
-  // go into next status
-  fovbc_status = fovbc_VposEn_status;
-
-  // start RTC timer
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, fovbc_pulseDelay, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
+/*
+  fovbc_loopCount++;
+  if(fovbc_loopCount > 400){
+    fovbc_loopCount = 0;
+    fovbc_shutdown();
+  }else{
+*/
+#ifndef LiuJH_NOTE
+    // reset VposEn and VnegEn pin
+    HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
+#endif
+#ifndef LiuJH_NOTE
+    HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
+#endif
+/*
+    // go into next status
+    fovbc_status = fovbc_VposEn_status;
+  
+    // start RTC timer
+    HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, fovbc_pulseDelay, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
+//  }
+*/
+  fovbc_smVposEn();
 }
 
 /*
@@ -53,16 +69,20 @@ static void fovbc_smPulsingLoop(void)
 */
 static void fovbc_smVnegEn(void)
 {
+#ifdef LiuJH_NOTE
   // Reset VnegEn pin
   HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
+#endif
 
   // go into next status
   fovbc_status = fovbc_pulsingLoop_status;
 
+#ifdef LiuJH_NOTE
   // set VposEn pin
   HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_SET);
+#endif
 
-#ifdef LiuJH_DEBUG
+#ifndef LiuJH_DEBUG
     // start TIM6 timer
     HAL_TIM_Base_Start_IT(&htim6);
 #else
@@ -81,16 +101,20 @@ static void fovbc_smVnegEn(void)
 */
 static void fovbc_smVposEn(void)
 {
+#ifdef LiuJH_NOTE
   // Reset VnegEn pin
   HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
+#endif
 
   // go into next status
   fovbc_status = fovbc_VnegEn_status;
 
+#ifdef LiuJH_NOTE
   // set VposEn pin
   HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_SET);
+#endif
 
-#ifdef LiuJH_DEBUG
+#ifndef LiuJH_DEBUG
   // start TIM6 timer
   HAL_TIM_Base_Start_IT(&htim6);
 #else
@@ -107,8 +131,10 @@ static void fovbc_smVposEn(void)
 */
 static void fovbc_smChipEnable(void)
 {
+#ifdef LiuJH_NOTE
   // Enable chip TI-TPS61096A(pin set)
   HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_SET);
+#endif
 
   // update status
   fovbc_status = fovbc_VposEn_status;
@@ -180,9 +206,9 @@ void fovbc_stateMachine(void)
   * @param  htim TIM handle
   * @retval None
   */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+void fovbc_TIM6_periodElapsedCB(TIM_HandleTypeDef *htim)
 {
-#ifdef LiuJH_DEBUG
+#ifndef LiuJH_DEBUG
   HAL_TIM_Base_Stop_IT(&htim6);
 #endif
   fovbc_stateMachine();
@@ -195,28 +221,34 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 */
 void fovbc_shutdown(void)
 {
-  // update status for LPM
-  fovbc_status = fovbc_idle_status;
-  
-#ifdef LiuJH_DEBUG
+#ifndef LiuJH_DEBUG
   HAL_TIM_Base_Stop_IT(&htim6);
 #endif
 
   // disable RTC timer
-  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
+//  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
 
   /* Clear the EXTI's line Flag for RTC WakeUpTimer */
-  __HAL_RTC_WAKEUPTIMER_EXTI_CLEAR_FLAG();
+//  __HAL_RTC_WAKEUPTIMER_EXTI_CLEAR_FLAG();
 
+  // update status for LPM
+  fovbc_status = fovbc_idle_status;
+
+#ifdef LiuJH_NOTE
   // reset VposEn and VnegEn pin
   HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
+#endif
+#ifdef LiuJH_NOTE
   HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
+#endif
 
   // update status
   fovbcIsWorking = false;
 
+#ifdef LiuJH_NOTE
   // switch OFF chip
   HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_RESET);
+#endif
 }
 
 /*
@@ -262,7 +294,7 @@ void fovbc_setPulseWidth(u8 _width)
   else
     fovbc_pulseCount = _width;
 
-#ifdef LiuJH_DEBUG
+#ifndef LiuJH_DEBUG
   // Using RTC timer as delay timer
   fovbc_pulseDelay = FOVBC_200HZ_COUNT - (fovbc_pulseCount << 10) / 3125 - 5;
 
@@ -283,10 +315,15 @@ void fovbc_setPulseWidth(u8 _width)
   htim6.Init.Period = fovbc_pulseCount;
   HAL_TIM_Base_Init(&htim6);
 #else
-  // set counter(rounding)
-  fovbc_pulseCount = ((fovbc_pulseCount << 10) + 3125) / 6250;
+/*
+  if(fovbc_pulseCount == FOVBC_PULSE_WIDTH_MAX)
+    fovbc_pulseCount = 160;
+  else
+*/
+    // set counter(rounding)
+    fovbc_pulseCount = 48;  // 44;
 
-  fovbc_pulseDelay = FOVBC_200HZ_COUNT - (fovbc_pulseCount << 1);
+  fovbc_pulseDelay = 48;  // 44;
 #endif
 }
 
@@ -301,6 +338,7 @@ bool fovbc_isWorking(void)
 void fovbc_init(void)
 {
   fovbcIsWorking = false;
+  fovbc_loopCount = 0;
 
 
   fovbc_status = fovbc_inited_status;

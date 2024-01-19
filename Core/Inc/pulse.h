@@ -14,15 +14,18 @@
 // heart rate max value of inner peace
 #define PULSING_BPM_CALM_MAX        125
 
-
+// default interval time of Rs peak point and Rv peak point
 #define PULSE_RSVI_DELAY_MS_DEFAULT 10
+// default delay time of Rv peak point and pulsing
 #define PULSE_RV_DELAY_MS_DEFAULT   20
+// default pulse number per R peak
 #define PULSE_NUM_DEFAULT           2
-// unit is 0.1ms, so 5ms is: 50
+// half width of pulse(unit is 0.1ms, so 5ms is: 50)
 #define PULSE_WIDTH_DEFAULT         50
 // dont pulse default(00:00 - 00:00) convert minutes
 #define PULSE_START_TIME_DEFAULT    0
 #define PULSE_END_TIME_DEFAULT      0
+
 
 // format: YY:MM:DD-HH:MM convert minutes: (((YY * 12 + MM) * 31) * 24 + HH) * 60
 // pulse_unpuling_start_dt default value:  2024-02-08 00:00 

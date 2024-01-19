@@ -172,7 +172,7 @@ static void ovbc_smStartup(void)
   2. purpose: Holding precise time Prevent interruption by other tasks;
   3. NOTICE: please hand move this function;
 */
-static void ovbc_stateMachine(void)
+void ovbc_stateMachine(void)
 {
   switch(ovbc_status){
     case ovbc_inited_status:
@@ -203,18 +203,6 @@ static void ovbc_stateMachine(void)
 /* public function define *******************************************/
 
 
-/*
-  brief:
-    1. Wakeup Timer callback;
-    2. 
-*/
-void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef *hrtc)
-{
-  if(fovbc_isWorking())
-    fovbc_stateMachine();
-  else
-    ovbc_stateMachine();
-}
 
 /*
   brief:
