@@ -510,10 +510,8 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 */
 void mcu_RtcTimerWkupCB(RTC_HandleTypeDef *hrtc)
 {
-  if(fovbc_isWorking())
-    fovbc_stateMachine();
-  else if(ovbc_isWorking())
-    ovbc_stateMachine();
+  if(ovbc_isWorking())
+    ovbc_updateState();
 }
 
 
@@ -553,6 +551,8 @@ void mcu_allStateMachine(void)
 
   // pulse state machine process
   pulse_StateMachine();
+  // start state machine
+  ovbc_stateMachine();
 
   // ACCEL state machine process
   accel_stateMachine();
@@ -571,6 +571,7 @@ void mcu_allStateMachine(void)
 
   // fpulse state machine process
   fpulse_stateMachine();
+  fovbc_stateMachine();
 
   // mcu other work driven
   mcu_workDriven();
@@ -688,6 +689,8 @@ void mcu_startup(void)
   // startup accel, check motion state;
   // NOTE: this process have 10ms delay;
   accel_startup();
+
+  HAL_TIM_Base_Start_IT(&htim6);
 
   // set next startup timetick
   mcu_motionTick = HAL_GetTick() + mcu_motionCfg.mcu_motionPeriod * 1000;

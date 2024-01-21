@@ -325,7 +325,13 @@ static void ecg_cbSmRnDetect(u8 _data)
     ecg_RnEscapedAll++;
 
     // twice continue escaped? restart R1 waiting...
-    if(ecg_RnEscaped >= ECG_ESCAPED_MAX_NUM){
+#ifndef LiuJH_DEBUG
+    // test only
+    if(ecg_RnEscaped >= 8)
+#else
+    if(ecg_RnEscaped >= ECG_ESCAPED_MAX_NUM)
+#endif
+    {
       // redo R detect, restart up ecg detection
       ecg_status = ecg_startup_status;
     }else{
@@ -757,7 +763,7 @@ ecg_cbSmR1Waitingend:
 static void ecg_smStartup(void)
 {
   // reinit
-  ecg_init2();
+  ecg_init();
 
   // ecg start working flag
   ecgIsWorking = true;

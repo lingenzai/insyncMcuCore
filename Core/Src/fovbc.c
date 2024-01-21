@@ -13,50 +13,78 @@
 static fovbc_status_typeDef fovbc_status;
 // fovbc is working flag
 static bool fovbcIsWorking;
-// fovbc pulse width
-static u32 fovbc_pulseCount = FOVBC_PULSE_DEFAULT_COUNT;
-// delay = (5 - 0.1 * 2) * 16.384 = 
-static u32 fovbc_pulseDelay = FOVBC_PULSE_DELAY_DEFAULT_COUNT;
+// pulse work time(2s)
+static u32 fovbc_pulseTick;
+// chip enable need time(15ms)
+static u32 fovbc_chipEnTick;
+// delay time after high+low pulse per pulse(total is 300ms)
+static u32 fovbc_loopTick;
 
-static u32 fovbc_loopCount;
-
+#ifndef LiuJH_DEBUG
+// test only
+static u32 fovbc_index, fovbc_stick[8], fovbc_etick[8];
+#endif
 
 /* private function define ******************************************/
 
 
-static void fovbc_smVposEn(void);
+/*
+  brief:
+    1. NOW: we have send a pulse, start delay;
+*/
+static void fovbc_smPulseDelay(void)
+{
+  // pulsing work is over?
+  if(HAL_GetTick() < fovbc_pulseTick){
+
+    // chip enable time is coming?
+    if(HAL_GetTick() >= fovbc_loopTick){
+      // start pulse interrupt
+      fovbc_loopTick = HAL_GetTick() + FOVBC_PULSETIME - FOVBC_PULSEWIDTH;
+
+      // update status
+      fovbc_status = fovbc_VposEn_status;
+
+      // start tim6
+      HAL_TIM_Base_Start_IT(&htim6);
+    }
+
+  }else{
+    // Game is over
+    fovbc_shutdown();
+  }
+}
 
 /*
   brief:
-    1. we have sent pulse once turn;
-    2. check loop num; continue pulsing or stop;
-    3. update status;
+    1. NOW: we have send a pulse, start delay;
+    2. stop tim6;
+    3. 
 */
-static void fovbc_smPulsingLoop(void)
+static void fovbc_smTim6Stop(void)
 {
+  // return chipEnable status for next pulse
+  fovbc_status = fovbc_pulseDelay_status;
+
+  HAL_TIM_Base_Stop_IT(&htim6);
+}
+
 /*
-  fovbc_loopCount++;
-  if(fovbc_loopCount > 400){
-    fovbc_loopCount = 0;
-    fovbc_shutdown();
-  }else{
+  brief:
+    1. NOW: we have send one pulse, start delay;
 */
-#ifndef LiuJH_NOTE
-    // reset VposEn and VnegEn pin
-    HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
-#endif
-#ifndef LiuJH_NOTE
-    HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
-#endif
-/*
-    // go into next status
-    fovbc_status = fovbc_VposEn_status;
-  
-    // start RTC timer
-    HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, fovbc_pulseDelay, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
-//  }
-*/
-  fovbc_smVposEn();
+static void fovbc_cbOnePulseEnd(void)
+{
+  // reset VnegEn pin
+  HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_SET);
+  // Reset VposEn pin
+  HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
+
+  // we will stop this timer for delay time
+  fovbc_status = fovbc_Tim6Stop_status;
+
+  // Can we stop tim6 in tim6 interrupt??????
+//  HAL_TIM_Base_Stop_IT(&htim6);
 }
 
 /*
@@ -67,28 +95,20 @@ static void fovbc_smPulsingLoop(void)
     NOTICE:
       at first: reset VposEn pin; and then set VnegEn pin; have some interval;
 */
-static void fovbc_smVnegEn(void)
+static void fovbc_cbSmVnegEn(void)
 {
-#ifdef LiuJH_NOTE
-  // Reset VnegEn pin
-  HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
-#endif
-
-  // go into next status
-  fovbc_status = fovbc_pulsingLoop_status;
-
-#ifdef LiuJH_NOTE
-  // set VposEn pin
-  HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_SET);
-#endif
-
 #ifndef LiuJH_DEBUG
-    // start TIM6 timer
-    HAL_TIM_Base_Start_IT(&htim6);
-#else
-  // start RTC timer
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, fovbc_pulseCount, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
+  // test only
+  fovbc_etick[fovbc_index] = HAL_GetTick();
 #endif
+
+  // Reset VposEn pin
+  HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
+  // set VnegEn pin
+  HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_SET);
+
+  // we have send one pulse(high+low)
+  fovbc_status = fovbc_onePulseEnd_status;
 }
 
 /*
@@ -99,28 +119,19 @@ static void fovbc_smVnegEn(void)
     NOTICE:
       at first: reset vneg pin; and then set vpos pin; have some interval;
 */
-static void fovbc_smVposEn(void)
+static void fovbc_cbSmVposEn(void)
 {
-#ifdef LiuJH_NOTE
+#ifndef LiuJH_DEBUG
+  // test only
+  fovbc_stick[fovbc_index++] = HAL_GetTick();
+#endif
+
   // Reset VnegEn pin
   HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
-#endif
-
-  // go into next status
-  fovbc_status = fovbc_VnegEn_status;
-
-#ifdef LiuJH_NOTE
   // set VposEn pin
   HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_SET);
-#endif
-
-#ifndef LiuJH_DEBUG
-  // start TIM6 timer
-  HAL_TIM_Base_Start_IT(&htim6);
-#else
-  // start RTC timer
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, fovbc_pulseCount, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
-#endif
+  
+  fovbc_status = fovbc_VnegEn_status;
 }
 
 /*
@@ -129,43 +140,44 @@ static void fovbc_smVposEn(void)
     2. delay left time before VposEn;
     3. update status;
 */
-static void fovbc_smChipEnable(void)
+static void fovbc_smChipEnabling(void)
 {
-#ifdef LiuJH_NOTE
-  // Enable chip TI-TPS61096A(pin set)
-  HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_SET);
-#endif
+  // test only
+  if(HAL_GetTick() < fovbc_chipEnTick) return;
+
+  // start pulse interrupt
+  fovbc_loopTick = HAL_GetTick() + FOVBC_PULSETIME - FOVBC_PULSEWIDTH;
 
   // update status
   fovbc_status = fovbc_VposEn_status;
 
-  // start RTC timer
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, OVBC_CHIP_EBABLE_COUNT, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
-}
-
-/*
-  brief:
-    1. startup chipEnable immediately;
-*/
-static void fovbc_smStartup(void)
-{
-  u32 wkcount;
-
-  // delay 1 ms to enable chip(only for maintaining the original architecture)
-  wkcount = OVBC_RTC_WKUP_COUNT_UNIT;
-
-  // update status
-  fovbc_status = fovbc_chipEnable_status;
-
-  // we can start timer
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, wkcount, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
-
-  /* all other status process will be in RTC Timer Callback */
+  // start tim6
+  HAL_TIM_Base_Start_IT(&htim6);
 }
 
 
 /* public function define *******************************************/
 
+
+/*
+*/
+void fovbc_cbStateMachine(void)
+{
+  switch(fovbc_status){
+    case fovbc_VposEn_status:
+      fovbc_cbSmVposEn();
+      break;
+    case fovbc_VnegEn_status:
+      fovbc_cbSmVnegEn();
+      break;
+    case fovbc_onePulseEnd_status:
+      fovbc_cbOnePulseEnd();
+      break;
+
+    default:
+      break;
+  }
+}
 
 /*
   1. all status proc after ovbc_startup_status working in RTC Timer Callback;
@@ -175,23 +187,14 @@ static void fovbc_smStartup(void)
 void fovbc_stateMachine(void)
 {
   switch(fovbc_status){
-    case fovbc_inited_status:
-      // do noting
+    case fovbc_chipEnabling_status:
+      fovbc_smChipEnabling();
       break;
-    case fovbc_startup_status:
-      fovbc_smStartup();
+    case fovbc_Tim6Stop_status:
+      fovbc_smTim6Stop();
       break;
-    case fovbc_chipEnable_status:
-      fovbc_smChipEnable();
-      break;
-    case fovbc_VposEn_status:
-      fovbc_smVposEn();
-      break;
-    case fovbc_VnegEn_status:
-      fovbc_smVnegEn();
-      break;
-    case fovbc_pulsingLoop_status:
-      fovbc_smPulsingLoop();
+    case fovbc_pulseDelay_status:
+      fovbc_smPulseDelay();
       break;
 
 
@@ -208,47 +211,27 @@ void fovbc_stateMachine(void)
   */
 void fovbc_TIM6_periodElapsedCB(TIM_HandleTypeDef *htim)
 {
-#ifndef LiuJH_DEBUG
-  HAL_TIM_Base_Stop_IT(&htim6);
-#endif
-  fovbc_stateMachine();
+  fovbc_cbStateMachine();
 }
 
 
 /*
   brief:
     1. when ble or pulse shut down, we will shut down;
+    2. NOW: the rtc timer or tim6 timer is stop;
 */
 void fovbc_shutdown(void)
 {
-#ifndef LiuJH_DEBUG
-  HAL_TIM_Base_Stop_IT(&htim6);
-#endif
-
-  // disable RTC timer
-//  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
-
-  /* Clear the EXTI's line Flag for RTC WakeUpTimer */
-//  __HAL_RTC_WAKEUPTIMER_EXTI_CLEAR_FLAG();
-
-  // update status for LPM
-  fovbc_status = fovbc_idle_status;
-
-#ifdef LiuJH_NOTE
+  // switch OFF chip
+  HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_RESET);
   // reset VposEn and VnegEn pin
   HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
-#endif
-#ifdef LiuJH_NOTE
   HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
-#endif
 
   // update status
   fovbcIsWorking = false;
-
-#ifdef LiuJH_NOTE
-  // switch OFF chip
-  HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_RESET);
-#endif
+  // update status for LPM
+  fovbc_status = fovbc_idle_status;
 }
 
 /*
@@ -262,16 +245,24 @@ void fovbc_startup(void)
   fovbc_init();
   fovbcIsWorking = true;
 
-#ifdef LiuJH_DEBUG
-  // update status
-  fovbc_status = fovbc_chipEnable_status;
-#else
-  // update status
-  fovbc_status = fovbc_startup_status;
-#endif
+  // init tim6 overflow time is 1ms
+  if(htim6.Init.Prescaler != FOVBC_TIM6_UP_PRESCA_1MS
+    || htim6.Init.Period != FOVBC_TIM6_UP_PERIOD_1MS){
+    htim6.Init.Prescaler = FOVBC_TIM6_UP_PRESCA_1MS;
+    htim6.Init.Period = FOVBC_TIM6_UP_PERIOD_1MS;
+    HAL_TIM_Base_Init(&htim6);
+  }
 
-  // start state machine
-  fovbc_stateMachine();
+  // init pulse time is 2s
+  fovbc_pulseTick = HAL_GetTick() + FPULSE_FOVBC_TICK;
+  // init chip enable time is 15ms
+  fovbc_chipEnTick = HAL_GetTick() + OVBC_CHIP_ENABLE_TIME - FOVBC_PULSEWIDTH;
+
+  // switch ON chip
+  HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_SET);
+
+  // update status
+  fovbc_status = fovbc_chipEnabling_status;
 }
 
 /*
@@ -287,6 +278,7 @@ void fovbc_setPulseWidth(u8 _width)
 {
   if(fovbcIsWorking) return;
 
+#ifndef LiuJH_DEBUG
   if(_width < FOVBC_PULSE_WIDTH_MIN)
     fovbc_pulseCount = FOVBC_PULSE_WIDTH_MIN;
   else if(_width > FOVBC_PULSE_WIDTH_MAX)
@@ -320,10 +312,13 @@ void fovbc_setPulseWidth(u8 _width)
     fovbc_pulseCount = 160;
   else
 */
-    // set counter(rounding)
+    // set counter(rounding); 3ms
     fovbc_pulseCount = 48;  // 44;
 
-  fovbc_pulseDelay = 48;  // 44;
+  // 200bpm is 300ms per circle; 300 - 7 = 293;
+  // 292.5ms * 16.384 = 4792.34
+  fovbc_pulseDelay = FOVBC_PULSE_DELAY_DEFAULT_COUNT;  // 44;
+#endif
 #endif
 }
 
@@ -338,14 +333,7 @@ bool fovbc_isWorking(void)
 void fovbc_init(void)
 {
   fovbcIsWorking = false;
-  fovbc_loopCount = 0;
-
 
   fovbc_status = fovbc_inited_status;
 }
-
-
-
-
-
 

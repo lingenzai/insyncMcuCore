@@ -28,13 +28,10 @@ static bool fpulse_startupFovbcFlag;
 */
 static void fpulse_smPulsing(void)
 {
-  // timeout? shuddown fovbc
-  if(HAL_GetTick() > fpulse_fovbcTick){
-//  if(!fovbc_isWorking()){
-    fovbc_shutdown();
-    // enter into inited status
-    fpulse_init();
-  }
+  if(fovbc_isWorking()) return;
+
+  // enter into inited status
+  fpulse_init();
 }
 
 /*
@@ -49,7 +46,7 @@ static void fpulse_smInited(void)
   // check flag
   if(!fpulse_startupFovbcFlag) return;
 
-#ifdef LiuJH_NOTE
+#ifdef LiuJH_DEBUG
   // stop working of pulse and ovbc
   pulse_bleConfigPulseOn(false);
   if(ovbc_isWorking())

@@ -8,25 +8,22 @@
 #ifndef INC_FOVBC_H_
 #define INC_FOVBC_H_
 
-#define LiuJH_NOTE
+
+// fpulse: high pulse width + low pulse width + delay time = 300ms; 200 bpm
+// fpulse: 0.1ms + 0.1ms + 299.8ms = 300ms(200bpm)
+#define FOVBC_PULSETIME       300
+// try in usint 1ms pulse width
+#define FOVBC_PULSEWIDTH      1
+// tim6: (c+1)(p+1)=2097*time(ms)
+
+// when time is 1ms, (c+1)(p+1) = 2097 = 9 * 233, So: p = 8, c = 232
+#define FOVBC_TIM6_UP_PRESCA_1MS   8
+#define FOVBC_TIM6_UP_PERIOD_1MS   232
+// when time is 5ms, (c+1)(p+1) = 2097 * 5 = 45 * 233, So: p = 44, c = 232
+#define FOVBC_TIM6_UP_PRESCA_5MS   44
+#define FOVBC_TIM6_UP_PERIOD_5MS   232
 
 
-/* force pulse width */
-// 0.1ms(unit: 10us)
-#define FOVBC_PULSE_WIDTH_MIN           10
-// 1 ms(unit: 10us)
-#define FOVBC_PULSE_WIDTH_MAX           100
-
-// count of 200 Hz(5ms), 5 * OVBC_RTC_WKUP_COUNT_UNIT = 81.92 = 82
-#define FOVBC_200HZ_COUNT               82
-
-// count default(2 / 16.384 = 0.12ms)
-#define FOVBC_PULSE_DEFAULT_COUNT       2
-// FOVBC_200HZ_COUNT - FOVBC_PULSE_DEFAULT_COUNT * 2
-#define FOVBC_PULSE_DELAY_DEFAULT_COUNT 78
-
-// OVBC_CHIP_ENABLE_TIME * OVBC_RTC_WKUP_COUNT_UNIT = 245.76
-#define OVBC_CHIP_EBABLE_COUNT          246
 
 
 typedef enum{
@@ -38,10 +35,10 @@ typedef enum{
   fovbc_inited_status,
   /*
   */
-  fovbc_startup_status,
+//  fovbc_startup_status,
   /*
   */
-  fovbc_chipEnable_status,
+  fovbc_chipEnabling_status,
   /*
   */
   fovbc_VposEn_status,
@@ -50,7 +47,13 @@ typedef enum{
   fovbc_VnegEn_status,
   /*
   */
-  fovbc_pulsingLoop_status,
+  fovbc_onePulseEnd_status,
+  /*
+  */
+  fovbc_Tim6Stop_status,
+  /*
+  */
+  fovbc_pulseDelay_status,
 
 
 
@@ -66,6 +69,7 @@ extern void fovbc_shutdown(void);
 extern void fovbc_stateMachine(void);
 extern void fovbc_setPulseWidth(u8 _width);
 extern void fovbc_TIM6_periodElapsedCB(TIM_HandleTypeDef *htim);
+extern void fovbc_cbStateMachine(void);
 
 
 #endif /* INC_FOVBC_H_ */

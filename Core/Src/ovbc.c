@@ -18,6 +18,8 @@ static u32 ovbc_VposEnTick;
 // loop num
 static u8 ovbc_pulsingLoopNum;
 
+static u32 ovbc_chipEnCount, ovbc_pulseCount;
+
 
 
 /* private function define ******************************************/
@@ -59,23 +61,23 @@ static void ovbc_smPulsingLoop(void)
 */
 static void ovbc_smVnegEn(void)
 {
-  ppulse_config_typeDef ppulse = pulse_getConfig();
-  u32 count;
+//  ppulse_config_typeDef ppulse = pulse_getConfig();
+//  u32 count;
 
   // Reset VnegEn pin
   HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
 
   // delay VnegEn pulsing time
-  count = ppulse->pulse_width * OVBC_RTC_WKUP_COUNT_UNIT / OVBC_PULSE_WIDTH_UNIT;
+//  count = ppulse->pulse_width * OVBC_RTC_WKUP_COUNT_UNIT / OVBC_PULSE_WIDTH_UNIT;
 
   // go into next status
-  ovbc_status = ovbc_pulsingLoop_status;
+  ovbc_status = ovbc_VnegEn2_status;
 
   // set VposEn pin
   HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_SET);
 
   // start RTC timer
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, count, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
+  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, ovbc_pulseCount, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
 }
 
 /*
@@ -88,23 +90,22 @@ static void ovbc_smVnegEn(void)
 */
 static void ovbc_smVposEn(void)
 {
-  ppulse_config_typeDef ppulse = pulse_getConfig();
-  u32 count;
+//  u32 count;
 
   // Reset VnegEn pin
   HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
 
   // delay VposEn pulsing time
-  count = ppulse->pulse_width * OVBC_RTC_WKUP_COUNT_UNIT / OVBC_PULSE_WIDTH_UNIT;
+//  count = ppulse->pulse_width * OVBC_RTC_WKUP_COUNT_UNIT / OVBC_PULSE_WIDTH_UNIT;
 
   // go into next status
-  ovbc_status = ovbc_VnegEn_status;
+  ovbc_status = ovbc_VposEn2_status;
 
   // set VposEn pin
   HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_SET);
 
   // start RTC timer
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, count, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
+  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, ovbc_pulseCount, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
 }
 
 /*
@@ -115,19 +116,17 @@ static void ovbc_smVposEn(void)
 */
 static void ovbc_smChipEnable(void)
 {
-  u32 count;
-
   // Enable chip TI-TPS61096A(pin set)
   HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_SET);
 
   // set rtc timer for next job: VposEn
-  count = (ovbc_VposEnTick - HAL_GetTick()) * OVBC_RTC_WKUP_COUNT_UNIT;
+//  count = (ovbc_VposEnTick - HAL_GetTick()) * OVBC_RTC_WKUP_COUNT_UNIT;
 
   // update status
-  ovbc_status = ovbc_VposEn_status;
+  ovbc_status = ovbc_chipEnable2_status;
 
   // start RTC timer
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, count, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
+  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, ovbc_chipEnCount, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
 }
 
 /*
@@ -141,13 +140,20 @@ static void ovbc_smStartup(void)
 {
   u32 ChipEnTick;
   u32 wkcount;
+  ppulse_config_typeDef ppulse = pulse_getConfig();
 
 #ifdef LiuJH_DEBUG
   // VposEnTick
-  ovbc_VposEnTick = ecg_getRnTick() + pulse_getConfig()->pulse_Rsvi_ms + pulse_getConfig()->pulse_Rv_delay_ms;
+  ovbc_VposEnTick = ecg_getRnTick() + ppulse->pulse_Rsvi_ms + ppulse->pulse_Rv_delay_ms;
 #else
   // VposEnTick
-  ovbc_VposEnTick = ecg_getRnTick() + ecg_getRsvi() + pulse_getConfig()->pulse_Rv_delay_ms;
+  ovbc_VposEnTick = ecg_getRnTick() + ecg_getRsvi() + ppulse->pulse_Rv_delay_ms;
+#endif
+
+#ifdef LiuJH_DEBUG
+    // calculate chip enable time count
+    ovbc_chipEnCount = OVBC_CHIP_ENABLE_TIME * OVBC_RTC_WKUP_COUNT_UNIT - 8;
+    ovbc_pulseCount = ppulse->pulse_width * OVBC_RTC_WKUP_COUNT_UNIT / OVBC_PULSE_WIDTH_UNIT - 8;
 #endif
 
   // chip start up need 15ms
@@ -158,7 +164,7 @@ static void ovbc_smStartup(void)
   wkcount = (ChipEnTick - HAL_GetTick()) * OVBC_RTC_WKUP_COUNT_UNIT;
 
   // update status
-  ovbc_status = ovbc_chipEnable_status;
+  ovbc_status = ovbc_startup2_status;
 
   // we can start timer
   HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, wkcount, RTC_WAKEUPCLOCK_RTCCLK_DIV2);
@@ -215,10 +221,10 @@ void ovbc_shutdown(void)
   HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
 
   // disable RTC timer
-  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
+//  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
 
   /* Clear the EXTI's line Flag for RTC WakeUpTimer */
-  __HAL_RTC_WAKEUPTIMER_EXTI_CLEAR_FLAG();
+//  __HAL_RTC_WAKEUPTIMER_EXTI_CLEAR_FLAG();
 
   // update status
   ovbcIsWorking = false;
@@ -228,6 +234,28 @@ void ovbc_shutdown(void)
 
   // switch OFF chip
   HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_RESET);
+}
+
+void ovbc_updateState(void)
+{
+  switch(ovbc_status){
+    case ovbc_startup2_status:
+      ovbc_status = ovbc_chipEnable_status;
+      break;
+    case ovbc_chipEnable2_status:
+      ovbc_status = ovbc_VposEn_status;
+      break;
+    case ovbc_VposEn2_status:
+      ovbc_status = ovbc_VnegEn_status;
+      break;
+    case ovbc_VnegEn2_status:
+      ovbc_status = ovbc_pulsingLoop_status;
+      break;
+
+
+    default:
+      break;
+  }
 }
 
 
@@ -246,7 +274,7 @@ void ovbc_startup(void)
   ovbc_status = ovbc_startup_status;
 
   // start state machine
-  ovbc_stateMachine();
+//  ovbc_stateMachine();
 }
 
 /*

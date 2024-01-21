@@ -48,6 +48,7 @@ RTC_HandleTypeDef hrtc;
 
 SPI_HandleTypeDef hspi2;
 
+TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim21;
 
 /* USER CODE BEGIN PV */
@@ -62,6 +63,7 @@ static void MX_I2C1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_TIM21_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -112,6 +114,7 @@ int main(void)
   MX_RTC_Init();
   MX_SPI2_Init();
   MX_TIM21_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
   // NOTE: MUST init after MX init(update MX init for out project)
@@ -463,6 +466,44 @@ static void MX_SPI2_Init(void)
 }
 
 /**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 44;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 232;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
+
+}
+
+/**
   * @brief TIM21 Initialization Function
   * @param None
   * @retval None
@@ -566,7 +607,7 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pin = CCM_PIN32_VPOS_EN_Pin|CCM_PIN33_VNEG_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : CCM_PIN38_BLE_CS_Pin */
@@ -578,10 +619,13 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : CCM_PIN46_VPON_Pin */
   GPIO_InitStruct.Pin = CCM_PIN46_VPON_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(CCM_PIN46_VPON_GPIO_Port, &GPIO_InitStruct);
+
+  /**/
+  HAL_I2CEx_EnableFastModePlus(I2C_FASTMODEPLUS_PB9);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI4_15_IRQn, 0, 0);

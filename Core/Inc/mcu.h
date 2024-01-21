@@ -144,6 +144,7 @@ extern RTC_HandleTypeDef hrtc;
 extern I2C_HandleTypeDef hi2c1;
 //extern WWDG_HandleTypeDef hwwdg;
 extern TIM_HandleTypeDef htim21;
+extern TIM_HandleTypeDef htim6;
 
 extern mcu_resetFlag_typeDef mcu_rstFlag;
 extern RTC_DateTypeDef mcu_date;

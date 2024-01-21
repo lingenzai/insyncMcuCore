@@ -19,6 +19,9 @@
 // Unit of pulse config->pulse_width is 0.1ms
 #define OVBC_PULSE_WIDTH_UNIT       10
 
+// weight of RTCcounter of RTC Timer config period is 500us(0.5ms * 16.384 = 8)
+#define OVBC_RTCT_CONFIG_WEIGHT     8
+
 
 
 typedef enum{
@@ -33,13 +36,25 @@ typedef enum{
   ovbc_startup_status,
   /*
   */
+  ovbc_startup2_status,
+  /*
+  */
   ovbc_chipEnable_status,
+  /*
+  */
+  ovbc_chipEnable2_status,
   /*
   */
   ovbc_VposEn_status,
   /*
   */
+  ovbc_VposEn2_status,
+  /*
+  */
   ovbc_VnegEn_status,
+  /*
+  */
+  ovbc_VnegEn2_status,
   /*
   */
   ovbc_pulsingLoop_status,
@@ -57,7 +72,7 @@ extern bool ovbc_isWorking(void);
 extern void ovbc_startup(void);
 extern void ovbc_shutdown(void);
 extern void ovbc_stateMachine(void);
-
+extern void ovbc_updateState(void);
 
 
 
