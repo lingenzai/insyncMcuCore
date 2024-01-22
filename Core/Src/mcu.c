@@ -503,17 +503,18 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
   mcu_deassertedCS(mcu_spiStatus);
 }
 
-/*
-  brief:
-    1. Wakeup Timer callback;
-    2. 
-*/
-void mcu_RtcTimerWkupCB(RTC_HandleTypeDef *hrtc)
+/**
+  * @brief  Period elapsed callback in non-blocking mode
+  * @param  htim TIM handle
+  * @retval None
+  */
+void mcu_TIM6_periodElapsedCB(TIM_HandleTypeDef *htim)
 {
-  if(ovbc_isWorking())
-    ovbc_updateState();
+  if(fovbc_isWorking())
+    fovbc_cbStateMachine();
+  else if(ovbc_isWorking())
+    ovbc_cbStateMachine();
 }
-
 
 /*
   brief:

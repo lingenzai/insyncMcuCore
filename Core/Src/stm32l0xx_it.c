@@ -154,7 +154,7 @@ void RTC_IRQHandler(void)
   /* USER CODE END RTC_IRQn 0 */
   HAL_RTCEx_WakeUpTimerIRQHandler(&hrtc);
   /* USER CODE BEGIN RTC_IRQn 1 */
-  mcu_RtcTimerWkupCB(&hrtc);
+
   /* USER CODE END RTC_IRQn 1 */
 }
 
@@ -196,7 +196,7 @@ void TIM6_DAC_IRQHandler(void)
   /* USER CODE END TIM6_DAC_IRQn 0 */
   HAL_TIM_IRQHandler(&htim6);
   /* USER CODE BEGIN TIM6_DAC_IRQn 1 */
-  fovbc_TIM6_periodElapsedCB(&htim6);
+  mcu_TIM6_periodElapsedCB(&htim6);
   /* USER CODE END TIM6_DAC_IRQn 1 */
 }
 

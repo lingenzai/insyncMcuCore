@@ -128,7 +128,7 @@ extern u8 pulse_cbStateMachine(u8 _data);
 extern bool pulse_isWorking(void);
 extern void pulse_bleConfigPulseOn(bool _isOn);
 extern void pulse_bleConfigPulseValues(u8 *_p);
-extern void pulse_setPulsingFlag(void);
+extern void pulse_setEcgPulsingFlag(void);
 extern bool pulse_blePulsingIsOn(void);
 
 

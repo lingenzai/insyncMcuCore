@@ -17,22 +17,19 @@
 #define FOVBC_PULSEWIDTH_1MS      1
 // when time is 1ms, (c+1)(p+1) = 2097 = 9 * 233, So: p = 8, c = 232
 #define FOVBC_TIM6_UP_PRESCA_1MS  8
-#define FOVBC_TIM6_UP_PERIOD_1MS  232
 
 #define FOVBC_PULSEWIDTH_2MS      2
 // when time is 2ms, (c+1)(p+1) = 2097 = 18 * 233, So: p = 17, c = 232
 #define FOVBC_TIM6_UP_PRESCA_2MS  17
-#define FOVBC_TIM6_UP_PERIOD_2MS  232
 
 #define FOVBC_PULSEWIDTH_5MS      5
 // when time is 5ms, (c+1)(p+1) = 2097 * 5 = 45 * 233, So: p = 44, c = 232
 #define FOVBC_TIM6_UP_PRESCA_5MS  44
-#define FOVBC_TIM6_UP_PERIOD_5MS  232
 
 // try in usint 1ms pulse width
 #define FOVBC_PULSEWIDTH          FOVBC_PULSEWIDTH_1MS
 #define FOVBC_TIM6_UP_PRESCA      FOVBC_TIM6_UP_PRESCA_1MS
-#define FOVBC_TIM6_UP_PERIOD      FOVBC_TIM6_UP_PERIOD_1MS
+#define FOVBC_TIM6_UP_PERIOD      232
 
 
 

@@ -155,7 +155,6 @@ extern void mcu_sysInit(void);
 extern void mcu_deviceInit(void);
 extern void mcu_startup(void);
 extern void mcu_allStateMachine(void);
-extern void mcu_RtcTimerWkupCB(RTC_HandleTypeDef *hrtc);
 extern bool mcu_spiRxUnblocked(u8 _devID, u8 *_prx, u16 _len);
 extern bool mcu_spiIsReady(void);
 extern void mcu_unlockSpi(void);
@@ -165,6 +164,7 @@ extern mcu_MotionConfig_typeDef *mcu_getMotionCfg(void);
 extern void mcu_setVoutsetPin(u8 _setvalue);
 extern void mcu_calibrateVoutset(void);
 extern void mcu_calibrateMotionPeriod(void);
+extern void mcu_TIM6_periodElapsedCB(TIM_HandleTypeDef *htim);
 
 extern void mcu_incTick(void);
 

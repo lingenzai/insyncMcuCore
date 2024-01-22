@@ -163,7 +163,8 @@ static bool pulse_isUltraBattLevel(void)
 static void pulse_enterLpm(void)
 {
   // make sure ovbc is shut down
-  ovbc_shutdown();
+  if(ovbc_isWorking())
+    ovbc_shutdown();
   // make sure wpr is shut down
   wpr_shutdown();
   
@@ -202,9 +203,6 @@ static void pulse_smPusingProc(void)
 
   /* ovbc is finished pulsing work */
 
-  // OFF this switch for next trigger
-  pulse_ecgPulsingOn = false;
-
   // for next pulsing
   pulse_status = pulse_waiting_status;
 }
@@ -230,16 +228,17 @@ static void pulse_smWaitingProc(void)
     pulse_enterLpm();
 
     // mcu will startup LPM working
-    return;
+    goto pulse_smWaitingProcEnd;
   }
 
   /* NOW: we can check pulsing switch and flag */
 
-  if(fpulse_isWorking()) return;
+  if(fpulse_isWorking())
+    goto pulse_smWaitingProcEnd;
 
   // if ble is working, ble_pulsing switch is OFF?
   if(ble_isWorking() && !pulse_blePulsingOn)
-    return;
+    goto pulse_smWaitingProcEnd;
 
   /* NOW: we can Detecting motion status and bpm */
 
@@ -247,10 +246,12 @@ static void pulse_smWaitingProc(void)
     // ignore checking both of accel and bpm
   }else{
     // check motion
-    if(!accel_isMotionless()) return;
+    if(!accel_isMotionless())
+      goto pulse_smWaitingProcEnd;
     
     // check bpm
-    if(!pulse_isInnerPeace()) return;
+    if(!pulse_isInnerPeace())
+      goto pulse_smWaitingProcEnd;
   }
 
   /* NOW: we will check ecg pulsing flag every R peak piont */
@@ -263,6 +264,11 @@ static void pulse_smWaitingProc(void)
     // update status
     pulse_status = pulse_pulsing_status;
   }
+
+
+pulse_smWaitingProcEnd:
+  // OFF this switch for next trigger
+  pulse_ecgPulsingOn = false;
 }
 
 /*
@@ -383,7 +389,7 @@ void pulse_bleConfigPulseOn(bool _isOn)
     1. ecg trigger pulse sending;
     2. set pulsing flag;
 */
-void pulse_setPulsingFlag(void)
+void pulse_setEcgPulsingFlag(void)
 {
   pulse_ecgPulsingOn = true;
 }

@@ -376,8 +376,9 @@ static void ecg_cbSmRnDetect(u8 _data)
 #endif
 
     // trigger pulse sending
-    if(ecg_RnDetected >= ECG_RN_DETECTED_MIN_NUM)
-      pulse_setPulsingFlag();
+    if(ecg_RnDetected >= ECG_RN_DETECTED_MIN_NUM){
+      pulse_setEcgPulsingFlag();
+    }
 
   }  else{
     // update prev data for next compare

@@ -19,6 +19,8 @@ static u32 fovbc_pulseTick;
 static u32 fovbc_chipEnTick;
 // delay time after high+low pulse per pulse(total is 300ms)
 static u32 fovbc_loopTick;
+// record tim6 prescaler and counter period of cure pulse
+static u32 fovbc_oldPrescaler;
 
 #ifndef LiuJH_DEBUG
 // test only
@@ -73,7 +75,7 @@ static void fovbc_smTim6Stop(void)
   brief:
     1. NOW: we have send one pulse, start delay;
 */
-static void fovbc_cbOnePulseEnd(void)
+static void fovbc_cbSmOnePulseEnd(void)
 {
   // reset VnegEn pin
   HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
@@ -171,7 +173,7 @@ void fovbc_cbStateMachine(void)
       fovbc_cbSmVnegEn();
       break;
     case fovbc_onePulseEnd_status:
-      fovbc_cbOnePulseEnd();
+      fovbc_cbSmOnePulseEnd();
       break;
 
     default:
@@ -203,18 +205,6 @@ void fovbc_stateMachine(void)
   }
 }
 
-
-/**
-  * @brief  Period elapsed callback in non-blocking mode
-  * @param  htim TIM handle
-  * @retval None
-  */
-void fovbc_TIM6_periodElapsedCB(TIM_HandleTypeDef *htim)
-{
-  fovbc_cbStateMachine();
-}
-
-
 /*
   brief:
     1. when ble or pulse shut down, we will shut down;
@@ -222,11 +212,16 @@ void fovbc_TIM6_periodElapsedCB(TIM_HandleTypeDef *htim)
 */
 void fovbc_shutdown(void)
 {
-  // switch OFF chip
-  HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_RESET);
   // reset VposEn and VnegEn pin
   HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
+
+  // switch OFF chip
+  HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_RESET);
+
+  // restore tim6 config of cure pulse
+  htim6.Init.Prescaler = fovbc_oldPrescaler;
+  HAL_TIM_Base_Init(&htim6);
 
   // update status
   fovbcIsWorking = false;
@@ -246,8 +241,11 @@ void fovbc_startup(void)
   fovbcIsWorking = true;
 
   // init tim6 overflow time is 1ms
-  if(htim6.Init.Prescaler != FOVBC_TIM6_UP_PRESCA
-    || htim6.Init.Period != FOVBC_TIM6_UP_PERIOD){
+  if(htim6.Init.Prescaler != FOVBC_TIM6_UP_PRESCA){
+    // temp save old prescaler and counter period
+    fovbc_oldPrescaler = htim6.Init.Prescaler;
+
+    // update new config
     htim6.Init.Prescaler = FOVBC_TIM6_UP_PRESCA;
     htim6.Init.Period = FOVBC_TIM6_UP_PERIOD;
     HAL_TIM_Base_Init(&htim6);
@@ -333,6 +331,9 @@ bool fovbc_isWorking(void)
 void fovbc_init(void)
 {
   fovbcIsWorking = false;
+
+  fovbc_oldPrescaler = FOVBC_TIM6_UP_PRESCA_5MS;
+
 #ifndef LiuJH_DEBUG
   // test only
   fovbc_index = 0;
