@@ -76,7 +76,7 @@ static void fovbc_smTim6Stop(void)
 static void fovbc_cbOnePulseEnd(void)
 {
   // reset VnegEn pin
-  HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
   // Reset VposEn pin
   HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
 
@@ -246,10 +246,10 @@ void fovbc_startup(void)
   fovbcIsWorking = true;
 
   // init tim6 overflow time is 1ms
-  if(htim6.Init.Prescaler != FOVBC_TIM6_UP_PRESCA_1MS
-    || htim6.Init.Period != FOVBC_TIM6_UP_PERIOD_1MS){
-    htim6.Init.Prescaler = FOVBC_TIM6_UP_PRESCA_1MS;
-    htim6.Init.Period = FOVBC_TIM6_UP_PERIOD_1MS;
+  if(htim6.Init.Prescaler != FOVBC_TIM6_UP_PRESCA
+    || htim6.Init.Period != FOVBC_TIM6_UP_PERIOD){
+    htim6.Init.Prescaler = FOVBC_TIM6_UP_PRESCA;
+    htim6.Init.Period = FOVBC_TIM6_UP_PERIOD;
     HAL_TIM_Base_Init(&htim6);
   }
 
@@ -333,6 +333,10 @@ bool fovbc_isWorking(void)
 void fovbc_init(void)
 {
   fovbcIsWorking = false;
+#ifndef LiuJH_DEBUG
+  // test only
+  fovbc_index = 0;
+#endif
 
   fovbc_status = fovbc_inited_status;
 }
