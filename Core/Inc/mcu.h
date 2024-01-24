@@ -44,7 +44,7 @@
 #define TIMEOUT_20S             20000   // AnimalTest release version value
 #define TIMEOUT_30S             30000
 // one minute timeout
-//#define TIMEOUT_60S             60000
+#define TIMEOUT_60S             60000
 // 2 minutes timeout
 //#define TIMEOUT_120S            120000
 // 10 minutes timeout
@@ -143,7 +143,7 @@ extern ADC_HandleTypeDef hadc;
 extern RTC_HandleTypeDef hrtc;
 extern I2C_HandleTypeDef hi2c1;
 //extern WWDG_HandleTypeDef hwwdg;
-extern TIM_HandleTypeDef htim21;
+//extern TIM_HandleTypeDef htim21;
 extern TIM_HandleTypeDef htim6;
 
 extern mcu_resetFlag_typeDef mcu_rstFlag;
@@ -165,8 +165,6 @@ extern void mcu_setVoutsetPin(u8 _setvalue);
 extern void mcu_calibrateVoutset(void);
 extern void mcu_calibrateMotionPeriod(void);
 extern void mcu_TIM6_periodElapsedCB(TIM_HandleTypeDef *htim);
-
-extern void mcu_incTick(void);
 
 
 #endif /* INC_MCU_H_ */

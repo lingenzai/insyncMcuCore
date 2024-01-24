@@ -115,19 +115,24 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
   }
 */
 
+  /* others channel compare in here */
+
+
+
+
+  /* NOTE: this is MUST the last compare */
+
   // is batt measurement data?
-  if(!(adc_curChNum ^ wpr_getAdcChNum())){
+  // ADC End of Regular sequence of Conversions
+  if(__HAL_ADC_GET_FLAG(hadc, ADC_FLAG_EOS)){
     wpr_adcConvCpltCB(HAL_ADC_GetValue(hadc));
-  }
 
-  // others channel data will ignore
-
-  // current channel isnot the last channel?
-  if(adc_curChNum ^ ADC_END_CHANNEL_NUM)
-    adc_curChNum++;
-  else
-    // next loop
+    // start next sequence sample(we want IN2-IN7 channels)
     adc_curChNum = ADC_START_CHANNEL_NUM;
+  }else{
+    // next channel loop
+    adc_curChNum++;
+  }
 }
 
 bool adc_isWorking()

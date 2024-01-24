@@ -12,7 +12,7 @@
 /* macro define *****************************************************/
 
 // battery level update time(unit: ms)
-#define WPR_BATT_LEVEL_UPDATE_TICK      TIMEOUT_5S //  60000 // 60S
+#define WPR_BATT_UPDATE_PERIOD          TIMEOUT_5S //  TIMEOUT_15S // TIMEOUT_20S // TIMEOUT_60S
 /*
   We sample 6 channels, so interval time is 4ms per point
   WPR_BATT_LEVEL_UPDATE_TICK / 4 = 1250
@@ -182,7 +182,6 @@ extern void wpr_adcConvCpltCB(u32 _adcvalue);
 extern void wpr_stateMachine(void);
 extern void wpr_init(void);
 extern void wpr_startup(void);
-extern u8 wpr_getAdcChNum(void);
 extern void wpr_shutdown(void);
 extern void wpr_setChargeSwitch(bool _isOn);
 extern bool wpr_isCharging(void);

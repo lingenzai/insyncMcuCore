@@ -13,20 +13,15 @@
 
 static wpr_status_typeDef wpr_status;
 static bool wprIsWorking;
-// record ble selected adc channel num
-static u8 wpr_adcChNum = ADC_CH_NUM_BATT_MEASURE;
 
 // record bit12 adc sample value(NOTICE: update per 4ms)
 static u32 wpr_adcValue;
-static u32 wpr_adcCount;
 // adc value got freq
 static u32 wpr_battUpdateTick;
 // record battery value, unit: 0.1V
 static u16 wpr_battValue;
 // reocrd battery percent, unit: 0.01
 static u8 wpr_battPercent;
-
-static bool wpr_valueIsUsing;
 
 // record start charge falg setting by ble
 static wpr_chargeSwitch_typeDef wpr_chargeSwitch;
@@ -121,25 +116,18 @@ static bool wpr_writeRegsValues(u16 _startRegaddr, u8 *_pSrc, u32 _datalen)
 */
 static void wpr_calculateBattLevel(void)
 {
-  static u32 adc = WPR_INVALID_VALUE;
+  u32 adc = wpr_adcValue;
   // adc max value(4.2V); adc min value(3.0V)
   u32 max = WPR_ADC_MAX_VALUE;
   u32 min = WPR_ADC_MIN_VALUE;
   u32 div = max - min;
 
-  // dont update, so dont calculate batt level
-  if(wpr_adcValue == adc
-    || (wpr_adcValue > adc && wpr_adcValue < adc + WPR_ADC_STEP)
-    || (wpr_adcValue < adc && wpr_adcValue + WPR_ADC_STEP > adc))
-    return;
+  // adc dont startup? is not calculate battery time?
+  if(wpr_adcValue == WPR_INVALID_VALUE
+    || HAL_GetTick() < wpr_battUpdateTick) return;
 
-/*
-  if(wpr_adclen)
-    adc = wpr_adcbuf[wpr_adclen - 1];
-  else
-    adc = wpr_adcbuf[WPR_ADCBUF_SIZE - 1];
-*/
-  adc = wpr_adcValue;
+  // for next update
+  wpr_battUpdateTick = HAL_GetTick() + WPR_BATT_UPDATE_PERIOD;
 
   // over flow max or min adc value?
   if(adc > max){
@@ -383,32 +371,7 @@ void wpr_stateMachine(void)
 */
 void wpr_adcConvCpltCB(u32 _adcvalue)
 {
-  wpr_adcCount++;
-
-  // first get value(delay 100ms)
-  if(!(wpr_adcValue ^ WPR_INVALID_VALUE)){
-    if(wpr_adcCount > WPR_BATT_UPDATE_COUNT1){
-      wpr_adcValue = _adcvalue;
-      wpr_adcCount = 0;
-    }
-  }else{
-    if(wpr_adcCount > WPR_BATT_UPDATE_COUNT){
-      wpr_adcValue = _adcvalue;
-      wpr_adcCount = 0;
-    }
-  }
-
-#ifndef LiuJH_DEBUG
-  // get and record adc value
-  if(!wpr_valueIsUsing){
-    // record data
-    if(wpr_adclen < WPR_ADCBUF_SIZE)
-      wpr_adcbuf[wpr_adclen++] = _adcvalue & 0x0FFF;
-    else
-      // debug break point only
-      wpr_adclen = 0;
-  }
-#endif
+  wpr_adcValue = _adcvalue;
 }
 
 /*
@@ -472,11 +435,6 @@ void wpr_shutdown(void)
   HAL_GPIO_WritePin(PIN30_PA9_WLC38_ON_GPIO_Port, PIN30_PA9_WLC38_ON_Pin, GPIO_PIN_SET);
 }
 
-u8 wpr_getAdcChNum(void)
-{
-  return wpr_adcChNum;
-}
-
 /*
   brief:
     1. 
@@ -494,17 +452,12 @@ void wpr_startup(void)
 void wpr_init(void)
 {
   wprIsWorking = false;
-  wpr_adcChNum = ADC_CH_NUM_BATT_MEASURE;
-//  wpr_adcChNum = ADC_CH_NUM_RA_RDET;
   wpr_adcValue = WPR_INVALID_VALUE;
-  wpr_adcCount = 0;
-//  wpr_adctick = 0;
   wpr_battUpdateTick = HAL_GetTick() + TIMEOUT_100MS;
   wpr_battValue = 0;
   wpr_battPercent = 0;
   wpr_chargeSwitch = wpr_chargeSwitch_off;
 
-  wpr_valueIsUsing = false;
 
   wpr_status = wpr_inited_status;
 }

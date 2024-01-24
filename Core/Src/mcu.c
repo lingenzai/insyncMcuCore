@@ -30,8 +30,8 @@ Data Format:
 static mcu_Voutset_typeDef mcu_Voutset;
 
 
+//static u32 mcu_tick = 0;
 
-static u32 mcu_tick = 0;
 
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private var define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
@@ -225,9 +225,6 @@ static void mcu_workDriven(void)
     adc_stop();
     accel_stop();
 
-    // stop my tick
-    HAL_TIM_Base_Stop_IT(&htim21);
-
     return;
   }
 
@@ -364,9 +361,6 @@ static void mcu_enterStandbyMode(void)
 
 static void mcu_init(void)
 {
-  // start my sysTick
-  HAL_TIM_Base_Start_IT(&htim21);
-
   // restore mcu date and time
   mcu_restoreDatetime();
 
@@ -781,22 +775,6 @@ void mcu_sysInit(void)
 
   // 2. 
 
-}
-
-void mcu_incTick(void)
-{
-  mcu_tick++;
-}
-
-/**
-  * @brief Provides a tick value in millisecond.
-  * @note This function is declared as __weak to be overwritten in case of other
-  *       implementations in user file.
-  * @retval tick value
-  */
-uint32_t HAL_GetTick(void)
-{
-  return mcu_tick;
 }
 
 
