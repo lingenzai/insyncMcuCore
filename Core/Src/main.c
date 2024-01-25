@@ -528,17 +528,10 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : CCM_PIN18_RSL10_RST_Pin */
-  GPIO_InitStruct.Pin = CCM_PIN18_RSL10_RST_Pin;
+  /*Configure GPIO pins : CCM_PIN18_RSL10_RST_Pin CCM_PIN21_BOOST_ON_Pin */
+  GPIO_InitStruct.Pin = CCM_PIN18_RSL10_RST_Pin|CCM_PIN21_BOOST_ON_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(CCM_PIN18_RSL10_RST_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : CCM_PIN21_BOOST_ON_Pin CCM_PIN25_MEM_CS_Pin CCM_PIN45_VOUT_SET_Pin */
-  GPIO_InitStruct.Pin = CCM_PIN21_BOOST_ON_Pin|CCM_PIN25_MEM_CS_Pin|CCM_PIN45_VOUT_SET_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
@@ -547,6 +540,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(CCM_PIN22_ACCEL_INT_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : CCM_PIN25_MEM_CS_Pin CCM_PIN45_VOUT_SET_Pin */
+  GPIO_InitStruct.Pin = CCM_PIN25_MEM_CS_Pin|CCM_PIN45_VOUT_SET_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PIN30_PA9_WLC38_ON_Pin */
   GPIO_InitStruct.Pin = PIN30_PA9_WLC38_ON_Pin;

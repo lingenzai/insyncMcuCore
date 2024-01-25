@@ -94,13 +94,32 @@ static void adc_smStartup(void)
 */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
-  /* check channel num, toast ecg or ble or igore */
+  /* check channel num, toast ecg or ble or ignore */
+
+  // about RA_IEGM: ignore
+  if(!(adc_curChNum ^ ADC_CH_NUM_RA_IEGM)){
+    // ignore, and wait next channel
+    adc_curChNum++;
+    return;
+  }
+
+  // is batt measurement data?
+  // ADC End of Regular sequence of Conversions
+  if(__HAL_ADC_GET_FLAG(hadc, ADC_FLAG_EOS)){
+    wpr_adcConvCpltCB(HAL_ADC_GetValue(hadc));
+
+    // start next sequence sample(we want IN2-IN7 channels), update ch num
+    adc_curChNum = ADC_START_CHANNEL_NUM;
+
+    // wait next channel
+    return;
+  }
+
+
 #ifndef LiuJH_DEBUG
 #else
   // is ecg channel data?
-//  if(ecg_isEcgAdcCh(adc_curChNum)){
     ecg_adcConvCpltCB(adc_curChNum);
-//  }
 
   // is ble channel data?
   if(ble_isBleAdcCh(adc_curChNum)){
@@ -119,20 +138,8 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 
 
 
-
-  /* NOTE: this is MUST the last compare */
-
-  // is batt measurement data?
-  // ADC End of Regular sequence of Conversions
-  if(__HAL_ADC_GET_FLAG(hadc, ADC_FLAG_EOS)){
-    wpr_adcConvCpltCB(HAL_ADC_GetValue(hadc));
-
-    // start next sequence sample(we want IN2-IN7 channels)
-    adc_curChNum = ADC_START_CHANNEL_NUM;
-  }else{
-    // next channel loop
-    adc_curChNum++;
-  }
+  // next channel loop
+  adc_curChNum++;
 }
 
 bool adc_isWorking()

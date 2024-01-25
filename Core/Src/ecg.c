@@ -62,6 +62,9 @@ static u32 ecg_adcStableTick;
 // record process finished
 static bool ecg_RsOk, ecg_RvOk;
 
+// dont update max and min value when Rn detection
+static bool ecg_isRnStable;
+
 
 /* private fuction define *****************************************/
 
@@ -119,15 +122,27 @@ static void ecg_trimAdcPeak(void)
 /*
   brief:
     1. adjust adc data from 12 bits to byte;[0, 255]
+    2. Rn detection is stable, we will send pulse; 
+    3. This action will cause signal fluctuations in Rs_RDET PIN, which need to be filtered out;
 */
 static u8 ecg_adjustAdcValueToByte(i32 _adcValue)
 {
-//  return (uint8_t)((_adcValue - ecg_adcMinValue) * 255 / (ecg_adcMaxValue - ecg_adcMinValue));
-
+  i32 sub1;
   // for efficiency
-  i32 sub1 = _adcValue - ecg_adcMinValue;
-  i32 sub2 = ecg_adcMaxValue - ecg_adcMinValue;
-  return (u8)(((sub1 << 8) - sub1) / sub2);
+  i32 sub2;
+  u8 ret = 0;
+
+  if(_adcValue > ecg_adcMinValue && _adcValue < ecg_adcMaxValue){
+    sub1 = _adcValue - ecg_adcMinValue;
+    sub2 = ecg_adcMaxValue - ecg_adcMinValue;
+    ret = (u8)(((sub1 << 8) - sub1) / sub2);
+  }
+  else if(_adcValue >= ecg_adcMaxValue)
+    ret = ECG_MAX_BYTE_VALUE;
+  else
+    ret = ECG_MIN_BYTE_VALUE;
+
+  return ret;
 }
 
 /*
@@ -276,6 +291,8 @@ static void ecg_init2(void)
   ecg_RnDetected = 0;
   ecg_RnEscaped = 0;
   ecg_RnEscapedAll = 0;
+
+  ecg_isRnStable = false;
 }
 
 /*
@@ -295,7 +312,7 @@ static void ecg_cbSmRnDetect(u8 _data)
 
 #ifdef LiuJH_DEBUG
   // For testing Rn detected ERROR
-  if(ecg_RsBufNum >= ECG_BUF_SIZE)
+  if(ecg_RsDetected == 1)
     ecg_RsBufNum = 0;
   ecg_addAdcDataToRbuf(ADC_CH_NUM_RS_RDET, _data);
 #endif
@@ -377,6 +394,10 @@ static void ecg_cbSmRnDetect(u8 _data)
 
     // trigger pulse sending
     if(ecg_RnDetected >= ECG_RN_DETECTED_MIN_NUM){
+
+      // set Rn stable flag
+      ecg_isRnStable = true;
+    
       pulse_setEcgPulsingFlag();
     }
 
@@ -862,6 +883,7 @@ void ecg_adcConvCpltCB(u8 _curCh)
   i32 value;
   u8 byte;
 
+  // dont channels we want
   if((_curCh ^ ADC_CH_NUM_RS_RDET) && (_curCh ^ ADC_CH_NUM_RV_RDET))
     return;
 
@@ -872,7 +894,8 @@ void ecg_adcConvCpltCB(u8 _curCh)
     update adc max and min value;
     record adc peak value pair interval 2.5s;
   */
-  ecg_recordPeakValue(value);
+  if(!ecg_isRnStable)
+    ecg_recordPeakValue(value);
 
   // adjust adc value to byte: [0, 255]
   byte = ecg_adjustAdcValueToByte(value);

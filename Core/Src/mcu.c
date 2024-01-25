@@ -106,9 +106,6 @@ static void mcu_restoreDatetime(void)
   // test: use 1Hz 16bit RTC timer, added 1s each wackeup, so:
   if(mcu_time.Seconds)
     mcu_time.Seconds--;
-/*
-  HAL_Delay(1000 - HAL_GetTick());
-*/
 #endif
   sTime.Seconds = mcu_time.Seconds;
   HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);

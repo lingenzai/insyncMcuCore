@@ -164,7 +164,7 @@ static bool wpr_configStwlc38(void)
   // chip power on
   HAL_GPIO_WritePin(PIN30_PA9_WLC38_ON_GPIO_Port, PIN30_PA9_WLC38_ON_Pin, GPIO_PIN_RESET);
   // delay for enable chip
-  HAL_Delay(2);
+
 
   // enable chip
   HAL_GPIO_WritePin(CCM_PIN21_BOOST_ON_GPIO_Port, CCM_PIN21_BOOST_ON_Pin, GPIO_PIN_RESET);
