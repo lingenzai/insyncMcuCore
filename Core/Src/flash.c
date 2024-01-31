@@ -402,9 +402,6 @@ static bool flash_enterDpm(void)
       // enter into dpm mode
       flash_writeOp(FLASH_OP_DPM);
       ret = true;
-
-      // delay 1ms wait???
-//      HAL_Delay(1);
     }
 
     // release spi

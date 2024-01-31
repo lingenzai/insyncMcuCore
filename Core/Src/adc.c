@@ -94,37 +94,52 @@ static void adc_smStartup(void)
 */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
-  /* check channel num, toast ecg or ble or igore */
+  /* check channel num, toast ecg or ble or ignore */
 
-  // is ecg channel data?
-  if(ecg_isEcgAdcCh(adc_curChNum)){
-    ecg_adcConvCpltCB(adc_curChNum);
+  // about RA_IEGM: ignore
+  if(!(adc_curChNum ^ ADC_CH_NUM_RA_IEGM)){
+    // ignore, and wait next channel
+    adc_curChNum++;
+    return;
   }
+
+  // is batt measurement data?
+  // ADC End of Regular sequence of Conversions
+  if(__HAL_ADC_GET_FLAG(hadc, ADC_FLAG_EOS)){
+    wpr_adcConvCpltCB(HAL_ADC_GetValue(hadc));
+
+    // start next sequence sample(we want IN2-IN7 channels), update ch num
+    adc_curChNum = ADC_START_CHANNEL_NUM;
+
+    // wait next channel
+    return;
+  }
+
+
+#ifndef LiuJH_DEBUG
+#else
+  // is ecg channel data?
+    ecg_adcConvCpltCB(adc_curChNum);
 
   // is ble channel data?
   if(ble_isBleAdcCh(adc_curChNum)){
     ble_adcConvCpltCB();
   }
+#endif
 
+ /*
   // is flash store twin1 or twin2?
   if(flash_isAdcStoreCh(adc_curChNum)){
     flash_adcConvCplCB(adc_curChNum);
   }
+*/
+
+  /* others channel compare in here */
 
 
-  // is batt measurement data?
-  if(!(adc_curChNum ^ wpr_getAdcChNum())){
-    wpr_adcConvCpltCB();
-  }
 
-  // others channel data will ignore
-
-  // current channel isnot the last channel?
-  if(adc_curChNum ^ ADC_END_CHANNEL_NUM)
-    adc_curChNum++;
-  else
-    // next loop
-    adc_curChNum = ADC_START_CHANNEL_NUM;
+  // next channel loop
+  adc_curChNum++;
 }
 
 bool adc_isWorking()

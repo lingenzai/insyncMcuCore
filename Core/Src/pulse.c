@@ -31,7 +31,8 @@ static u32 pulse_workOverTick;
 static bool pulse_ecgPulsingOn;
 
 // APP ask pulse ON/OFF(default: OFF)
-bool pulse_blePulsingOn;
+static bool pulse_blePulsingOn;
+
 
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private var define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
@@ -83,6 +84,9 @@ static u32 pulse_getLastMinute(u32 _m)
 */
 static bool pulse_isPulseTime(void)
 {
+#ifndef LiuJH_DEBUG
+  return true;
+#else
   bool ret = false;
   u32 m1, m2;
 
@@ -101,24 +105,28 @@ static bool pulse_isPulseTime(void)
   m1 = (m1 * 24 + mcu_time.Hours) * 60 + mcu_time.Minutes;
   // is in unpulsing period?
   if(m1 >= pulse_unpulsingPeriod.startDt
-    && m1 <= pulse_unpulsingPeriod.endDt)
+    && m1 <= pulse_unpulsingPeriod.endDt){
     return ret;
+  }
 
   /* compare pulsing time of every day */
 
   // dont need send pulse?
-  if(pulse_config.pulse_start_time == pulse_config.pulse_end_time)
+  if(pulse_config.pulse_start_time == pulse_config.pulse_end_time){
     return ret;
+  }
 
   // current time convert to Minutes
   m1 = mcu_time.Hours * 60 + mcu_time.Minutes;
   m2 = pulse_config.pulse_start_time;
 
   // compare time(unit: minutes)
-  if(m1 == m2 || m1 == pulse_getLastMinute(m2) || m1 == pulse_getNextMinute(m2))
+  if(m1 == m2 || m1 == pulse_getLastMinute(m2) || m1 == pulse_getNextMinute(m2)){
     ret = true;
+  }
 
   return ret;
+#endif
 }
 
 /*
@@ -148,6 +156,20 @@ static bool pulse_isUltraBattLevel(void)
     ret = true;
 
   return ret;
+}
+
+/*
+*/
+static void pulse_enterLpm(void)
+{
+  // make sure ovbc is shut down
+  if(ovbc_isWorking())
+    ovbc_shutdown();
+  // make sure wpr is shut down
+  wpr_shutdown();
+  
+  // stop work and go into idle(we can LPM)
+  pulse_status = pulse_idle_status;
 }
 
 /*
@@ -181,9 +203,6 @@ static void pulse_smPusingProc(void)
 
   /* ovbc is finished pulsing work */
 
-  // OFF this switch for next trigger
-  pulse_ecgPulsingOn = false;
-
   // for next pulsing
   pulse_status = pulse_waiting_status;
 }
@@ -203,26 +222,23 @@ static void pulse_smWaitingProc(void)
 {
   // ble working time is over or pulse working time is over?
   // if only pulse is working, check batt
-  if(pulse_workTimeIsOver()
-    || pulse_isUltraBattLevel()){
-    // make sure ovbc is shut down
-    ovbc_shutdown();
-    // make sure wpr is shut down
-    wpr_shutdown();
+  if(pulse_workTimeIsOver() || pulse_isUltraBattLevel()){
 
-    // stop work and go into idle(we can LPM)
-    pulse_status = pulse_idle_status;
+    // enter standby mode
+    pulse_enterLpm();
 
     // mcu will startup LPM working
-    return;
+    goto pulse_smWaitingProcEnd;
   }
 
   /* NOW: we can check pulsing switch and flag */
 
+  if(fpulse_isWorking())
+    goto pulse_smWaitingProcEnd;
 
   // if ble is working, ble_pulsing switch is OFF?
   if(ble_isWorking() && !pulse_blePulsingOn)
-    return;
+    goto pulse_smWaitingProcEnd;
 
   /* NOW: we can Detecting motion status and bpm */
 
@@ -230,10 +246,12 @@ static void pulse_smWaitingProc(void)
     // ignore checking both of accel and bpm
   }else{
     // check motion
-    if(!accel_isMotionless()) return;
+    if(!accel_isMotionless())
+      goto pulse_smWaitingProcEnd;
     
     // check bpm
-    if(!pulse_isInnerPeace()) return;
+    if(!pulse_isInnerPeace())
+      goto pulse_smWaitingProcEnd;
   }
 
   /* NOW: we will check ecg pulsing flag every R peak piont */
@@ -246,6 +264,11 @@ static void pulse_smWaitingProc(void)
     // update status
     pulse_status = pulse_pulsing_status;
   }
+
+
+pulse_smWaitingProcEnd:
+  // OFF this switch for next trigger
+  pulse_ecgPulsingOn = false;
 }
 
 /*
@@ -256,20 +279,26 @@ static void pulse_smWaitingProc(void)
 */
 static void pulse_smStartupProc(void)
 {
-  u32 time = 0;
+  u32 minutes = 0;
 
   pulse_init();
+  pulseIsWorking = true;
 
   // start all six channel
   adc_startup();
 
+#ifndef LiuJH_DEBUG
+  minutes = 1;
+#else
   // get pulse work seconds
   if(pulse_config.pulse_end_time < pulse_config.pulse_start_time)
-    time = MCU_MAX_MINUTE_EACH_DAY + pulse_config.pulse_end_time - pulse_config.pulse_start_time;
+    minutes = MCU_MAX_MINUTE_EACH_DAY + pulse_config.pulse_end_time - pulse_config.pulse_start_time;
   else
-    time = pulse_config.pulse_end_time - pulse_config.pulse_start_time;
-  pulse_workOverTick = HAL_GetTick() + time * 60;
-  pulseIsWorking = true;
+    minutes = pulse_config.pulse_end_time - pulse_config.pulse_start_time;
+#endif
+  // get tick(unit: ms)
+  pulse_workOverTick = HAL_GetTick() + minutes * 60 * 1000;
+//  pulse_workOverTick = HAL_GetTick() + (minutes+60) * 60 * 1000;
 
   pulse_status = pulse_waiting_status;
 }
@@ -360,7 +389,7 @@ void pulse_bleConfigPulseOn(bool _isOn)
     1. ecg trigger pulse sending;
     2. set pulsing flag;
 */
-void pulse_setPulsingFlag(void)
+void pulse_setEcgPulsingFlag(void)
 {
   pulse_ecgPulsingOn = true;
 }

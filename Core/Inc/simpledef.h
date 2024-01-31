@@ -20,16 +20,7 @@
 #define LiuJH_DEBUG
 
 
-// ICM and CCM
-#ifndef LiuJH_DEBUG
-// for ICM test
-#define Insync_ICM
 
-#else
-// for CCM
-#define Insync_CCM
-
-#endif
 
 /*  types ------------------------------------------------------------*/
 typedef uint32_t  u32;

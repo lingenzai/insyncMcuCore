@@ -28,7 +28,7 @@
 */
 static bool ee_readData(u32 _addr, u8 *_pdata, u32 _len)
 {
-#ifndef LiuJH_DEBUG
+#ifdef LiuJH_DEBUG
   bool ret = false;
   u8 *pd = _pdata;
   __IO u8 *ps = (__IO u8 *)(_addr);
@@ -53,30 +53,33 @@ static bool ee_readData(u32 _addr, u8 *_pdata, u32 _len)
 
 /*
   brief:
-    1. write data to EEPROM according _type;
-    2. 
-*/
-static void ee_writeBaseType(u32 _type, u32 _addr, u32 _data)
-{
-#ifndef LiuJH_DEBUG
-  HAL_FLASHEx_DATAEEPROM_Unlock();
-  HAL_FLASHEx_DATAEEPROM_Program(_type, _addr, _data);
-  HAL_FLASHEx_DATAEEPROM_Lock();
-#endif
-}
-
-/*
-  brief:
     1. 
 */
 static bool ee_writeData(u32 _addr, u8 *_pdata, u32 _len)
 {
+#ifdef LiuJH_DEBUG
+  // check param
+  if(!IS_FLASH_DATA_ADDRESS(_addr) || !_pdata || 
+    !IS_FLASH_DATA_ADDRESS(_addr + _len - 1))
+    return false;
+
+
+  HAL_FLASHEx_DATAEEPROM_Unlock();
+  while(_len){
+    HAL_FLASHEx_DATAEEPROM_Program(ee_byte_type, _addr++, *_pdata++);
+    _len--;
+    HAL_Delay(5);
+  }
+  HAL_FLASHEx_DATAEEPROM_Lock();
+
+  return true;
+#else
   bool ret = false;
   u32 *pd4 = (u32 *)_addr;
   u16 *pd2;
   u32 *ps4 = (u32 *)_pdata;
   u16 *ps2;
-  u32 num;
+  u32 num = _len;
 //  u32 tick = HAL_GetTick();
 
   // check param
@@ -107,6 +110,7 @@ static bool ee_writeData(u32 _addr, u8 *_pdata, u32 _len)
 
 //  tick = HAL_GetTick() - tick;
   return true;
+#endif
 }
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private function define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
@@ -171,39 +175,48 @@ bool ee_restoreKeyValue(void)
         param1: pulseConfig;
         param2: 
 */
-bool ee_storeKeyValue(void)
+bool ee_storeKeyValue(ee_keyvalue_typeDef _key)
 {
   u32 addr;
   u8 *pdata;
   u32 len;
   bool ret = true;
 
-  // Param1: pulseConfig
-  addr = ee_addr_pulseConfig;
-  pdata = (u8 *)pulse_getConfig();
-  len = ee_addr_pulseConfig_size;
+  switch(_key){
+    case ee_kv_pulseConfig:
+      // Param1: pulseConfig
+      addr = ee_addr_pulseConfig;
+      pdata = (u8 *)pulse_getConfig();
+      len = ee_addr_pulseConfig_size;
+      break;
+    case ee_kv_unpulsingPeriod:
+      // Param2: unpulsing period
+      addr = ee_addr_unpulsingPeriod;
+      pdata = (u8 *)pulse_getUnpulsingPeriod();
+      len = ee_addr_unpulsingPeriod_size;
+      break;
+    case ee_kv_VoutSet:
+      // Param3: pulse Vout_set config value
+      addr = ee_addr_VoutSet;
+      pdata = (u8 *)mcu_getVoutset();
+      len = ee_addr_VoutSet_size;
+      break;
+    case ee_kv_motionPeriod:
+      // Param4: motion period redo config
+      addr = ee_addr_motionPeriod;
+      pdata = (u8 *)mcu_getMotionCfg();
+      len = ee_addr_motionPeriod_size;
+      break;
+
+
+    default:
+      break;
+  }
+
   ee_writeData(addr, pdata, len);
+
   // the last data write time delay, need it???
-//  HAL_Delay(2);
-
-  // Param2: unpulsing period
-  addr = ee_addr_unpulsingPeriod;
-  pdata = (u8 *)pulse_getUnpulsingPeriod();
-  len = ee_addr_unpulsingPeriod_size;
-  ee_writeData(addr, pdata, len);
-
-  // Param3: pulse Vout_set config value
-  addr = ee_addr_VoutSet;
-  pdata = (u8 *)mcu_getVoutset();
-  len = ee_addr_VoutSet_size;
-  ee_writeData(addr, pdata, len);
-
-  // Param4: motion period redo config
-  addr = ee_addr_motionPeriod;
-  pdata = (u8 *)mcu_getMotionCfg();
-  len = ee_addr_motionPeriod_size;
-  ee_writeData(addr, pdata, len);
-
+  HAL_Delay(2);
 
   return ret;
 }

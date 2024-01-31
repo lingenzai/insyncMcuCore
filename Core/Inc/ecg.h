@@ -48,7 +48,7 @@
 #define ECG_R2_MW_SIZE              6
 
 // define slope default value
-#define ECG_SLOPE_DEFAULT           40
+#define ECG_SLOPEV_DEFAULT          15
 // slope step(get ONE slope per four points)
 #define ECG_SLOPE_STEP              3
 // we will get four slopes left R1 and right R1
@@ -56,19 +56,24 @@
 // use 0.80 as slope weight
 #define ECG_SLOPE_WEIGHT            4 / 5
 // use 0.85 as R value weight
-#define ECG_R_VALUE_WEIGHT          17 / 20
-
-// Rn move window size
-#define ECG_Rn_MW_HALF_SIZE         4 // 2
+#define ECG_R_VALUE_WEIGHT          9 / 10  // 17 / 20  /* 29/32 */	// 	
+// Rn half of move window size
+#define ECG_Rn_MW_HALF_SIZE         3 // 2  // 4 // 
+// Rn detect data num
+#define ECG_RN_DETECT_NUM           3
 // 4 + 1 + 4, guess Rn peak point is in middle of these points
 //#define ECG_Rn_MW_SIZE              (ECG_Rn_MW_HALF_SIZE * 2 + 1) // 9
 // if Rw escape, Rw size will update
 #define ECG_Rn_MW_Weight            2
 
 // continue get Rn numbers we can pulsing
-#define ECG_RN_DETECTED_MIN_NUM     5
+#define ECG_RN_DETECTED_MIN_NUM     4
 
 #define ECG_ESCAPED_MAX_NUM         2
+
+#define ECG_ADC_CH_NUM              2
+#define ECG_RS_INDEX                0
+#define ECG_RV_INDEX                1
 
 
 
@@ -99,6 +104,16 @@ typedef enum{
     2. go into next status;
   */
   ecg_startup_status,
+  /*
+    1. only store u16 data into buf, and sample peak point;
+    2. dont convert to u8 data;
+  */
+  ecg_stableWaiting_status,
+  /*
+    1. only synchronous Loop stateMachine and ADC callback;
+    2. update all vars of buf in Loop stateMachine, and AdcCB do nothing;
+  */
+  ecg_sync1_status,
   /*
     1. adc sample start, and record adc data;
     2. until 2.5 s, make sure include one R peak point;
@@ -143,8 +158,9 @@ typedef enum{
   ecg_RnDetect_status,
 
   /*
+    1. 
   */
-  ecg_RwDetect_status,
+  ecg_RnDetected_status,
 
 
   pulse_Max_status
@@ -163,7 +179,6 @@ extern void ecg_init(void);
 extern void ecg_stateMachine(void);
 extern void ecg_startup(void);
 extern void ecg_adcConvCpltCB(u8 _curCh);
-extern bool ecg_isEcgAdcCh(u8 _curCh);
 extern u8 ecg_getBpm(void);
 extern u32 ecg_getRnTick(void);
 extern bool ecg_getRsviAbout(u8 *_pdata);

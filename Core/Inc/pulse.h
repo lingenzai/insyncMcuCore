@@ -14,15 +14,18 @@
 // heart rate max value of inner peace
 #define PULSING_BPM_CALM_MAX        125
 
-
+// default interval time of Rs peak point and Rv peak point
 #define PULSE_RSVI_DELAY_MS_DEFAULT 10
+// default delay time of Rv peak point and pulsing
 #define PULSE_RV_DELAY_MS_DEFAULT   20
+// default pulse number per R peak
 #define PULSE_NUM_DEFAULT           2
-// unit is 0.1ms, so 5ms is: 50
+// half width of pulse(unit is 0.1ms, so 5ms is: 50)
 #define PULSE_WIDTH_DEFAULT         50
 // dont pulse default(00:00 - 00:00) convert minutes
 #define PULSE_START_TIME_DEFAULT    0
 #define PULSE_END_TIME_DEFAULT      0
+
 
 // format: YY:MM:DD-HH:MM convert minutes: (((YY * 12 + MM) * 31) * 24 + HH) * 60
 // pulse_unpuling_start_dt default value:  2024-02-08 00:00 
@@ -61,7 +64,7 @@ typedef struct{
   // pulse width(unit: 0.1ms), so width / 10 = count of ms
   u8 pulse_width;
 
-  // convert to Minutes
+  // convert to Minutes(unit: minute)
   u32 pulse_start_time;
   u32 pulse_end_time;
 } pulse_config_typeDef, *ppulse_config_typeDef;
@@ -108,17 +111,6 @@ typedef enum{
     2. finish pulsing, update to waiting status;
   */
   pulse_pulsing_status,
-  /*
-    1. set pin high the first time;
-    2. time is 2.5ms;
-  */
-  pulse_high_status,
-  /*
-    1. set pin low the first time;
-    2. time is 2.5ms;
-  */
-  pulse_low_status,
-
 
   pulse_max_status
 } pulse_status_typeDef;
@@ -136,7 +128,7 @@ extern u8 pulse_cbStateMachine(u8 _data);
 extern bool pulse_isWorking(void);
 extern void pulse_bleConfigPulseOn(bool _isOn);
 extern void pulse_bleConfigPulseValues(u8 *_p);
-extern void pulse_setPulsingFlag(void);
+extern void pulse_setEcgPulsingFlag(void);
 extern bool pulse_blePulsingIsOn(void);
 
 

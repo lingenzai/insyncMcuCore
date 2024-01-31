@@ -43,6 +43,8 @@ extern "C" {
 #include "wpr.h"
 #include "flash.h"
 #include "ovbc.h"
+#include "fpulse.h"
+#include "fovbc.h"
 
 
 /* USER CODE END Includes */
@@ -74,8 +76,6 @@ extern void main_adcConfigAllCh(void);
 /* Private defines -----------------------------------------------------------*/
 #define CCM_PIN10_WKUP_INTR_Pin GPIO_PIN_0
 #define CCM_PIN10_WKUP_INTR_GPIO_Port GPIOA
-#define CCM_PIN12_RA_IEGM_Pin GPIO_PIN_2
-#define CCM_PIN12_RA_IEGM_GPIO_Port GPIOA
 #define CCM_PIN13_RS_RDET_Pin GPIO_PIN_3
 #define CCM_PIN13_RS_RDET_GPIO_Port GPIOA
 #define CCM_PIN14_RS_IEGM_Pin GPIO_PIN_4
@@ -84,13 +84,8 @@ extern void main_adcConfigAllCh(void);
 #define CCM_PIN15_RV_RDET_GPIO_Port GPIOA
 #define CCM_PIN16_RV_IEGM_Pin GPIO_PIN_6
 #define CCM_PIN16_RV_IEGM_GPIO_Port GPIOA
-#define CCM_PIN17_BATT_M_Pin GPIO_PIN_7
-#define CCM_PIN17_BATT_M_GPIO_Port GPIOA
-#define CCM_PIN19_WPR_INT_Pin GPIO_PIN_1
-#define CCM_PIN19_WPR_INT_GPIO_Port GPIOB
-#define CCM_PIN19_WPR_INT_EXTI_IRQn EXTI0_1_IRQn
-#define CCM_PIN20_RSL10_WKUP_Pin GPIO_PIN_2
-#define CCM_PIN20_RSL10_WKUP_GPIO_Port GPIOB
+#define CCM_PIN18_RSL10_RST_Pin GPIO_PIN_0
+#define CCM_PIN18_RSL10_RST_GPIO_Port GPIOB
 #define CCM_PIN21_BOOST_ON_Pin GPIO_PIN_10
 #define CCM_PIN21_BOOST_ON_GPIO_Port GPIOB
 #define CCM_PIN22_ACCEL_INT_Pin GPIO_PIN_11
@@ -100,6 +95,8 @@ extern void main_adcConfigAllCh(void);
 #define CCM_PIN25_MEM_CS_GPIO_Port GPIOB
 #define CCM_PIN26_SP1_CLK_Pin GPIO_PIN_13
 #define CCM_PIN26_SP1_CLK_GPIO_Port GPIOB
+#define PIN30_PA9_WLC38_ON_Pin GPIO_PIN_9
+#define PIN30_PA9_WLC38_ON_GPIO_Port GPIOA
 #define CCM_PIN32_VPOS_EN_Pin GPIO_PIN_11
 #define CCM_PIN32_VPOS_EN_GPIO_Port GPIOA
 #define CCM_PIN33_VNEG_EN_Pin GPIO_PIN_12

@@ -8,16 +8,13 @@
 #ifndef INC_OVBC_H_
 #define INC_OVBC_H_
 
-// this ChipEn start up use 15ms (maybe), stable
-#define OVBC_CHIP_ENABLE_TIME       15
-
-// RTC Timer LSI RC(37KHz) DIV2 unit count
-//#define OVBC_RTC_WKUP_COUNT_UNIT    37 / 2
-// RTC Timer LSE ORC(32.768 KHz) DIV2 unit count
-#define OVBC_RTC_WKUP_COUNT_UNIT    16384 / 1000  // 32768 / 2000
+// this ChipEn start up use 15ms (maybe), stable; try it with 5ms
+#define OVBC_CHIP_ENABLE_TIME       5	// 15
 
 // Unit of pulse config->pulse_width is 0.1ms
 #define OVBC_PULSE_WIDTH_UNIT       10
+#define OVBC_PULSE_WIDTH_HALF_UNIT  5
+
 
 
 
@@ -36,13 +33,19 @@ typedef enum{
   ovbc_chipEnable_status,
   /*
   */
+  ovbc_chipEnabling_status,
+  /*
+  */
   ovbc_VposEn_status,
   /*
   */
   ovbc_VnegEn_status,
   /*
   */
-  ovbc_pulsingLoop_status,
+  ovbc_onePulseEnd_status,
+  /*
+  */
+  ovbc_Tim6Stop_status,
 
 
 
@@ -56,8 +59,8 @@ extern void ovbc_init(void);
 extern bool ovbc_isWorking(void);
 extern void ovbc_startup(void);
 extern void ovbc_shutdown(void);
-
-
+extern void ovbc_stateMachine(void);
+extern void ovbc_cbStateMachine(void);
 
 
 

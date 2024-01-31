@@ -18,6 +18,7 @@
 #define ADC_CH_NUM_RV_RDET          5
 #define ADC_CH_NUM_RV_IEGM          6
 #define ADC_CH_NUM_BATT_MEASURE     7
+#define ADC_CH_NUM_VREF             8
 
 // sample one point per 4ms, then 15000 points per minute.
 #define ADC_SAMPLE_STEP             6
