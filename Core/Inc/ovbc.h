@@ -8,8 +8,8 @@
 #ifndef INC_OVBC_H_
 #define INC_OVBC_H_
 
-// this ChipEn start up use 15ms (maybe), stable
-#define OVBC_CHIP_ENABLE_TIME       15
+// this ChipEn start up use 15ms (maybe), stable; try it with 5ms
+#define OVBC_CHIP_ENABLE_TIME       5	// 15
 
 // Unit of pulse config->pulse_width is 0.1ms
 #define OVBC_PULSE_WIDTH_UNIT       10

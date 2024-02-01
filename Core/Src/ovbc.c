@@ -181,7 +181,7 @@ static void ovbc_smChipEnable(void)
 */
 static void ovbc_smStartup(void)
 {
-  u32 tick = HAL_GetTick() - ecg_getRnTick();
+  u32 tick = ecg_getRnTick();
   ppulse_config_typeDef ppulse = pulse_getConfig();
   u32 delay, Prescaler;
 
@@ -194,12 +194,24 @@ static void ovbc_smStartup(void)
   delay = ecg_getRsvi() + ppulse->pulse_Rv_delay_ms;
 #endif
 
+	// check param
+	if(HAL_GetTick() < tick){
+		ovbc_shutdown();
+		// dont send pulse
+		return;
+	}
+
+	// get escape time(tick >= 0)
+	tick = HAL_GetTick() - tick;
+
   // check period R peak point tick
   if(delay < OVBC_CHIP_ENABLE_TIME + tick){
     ovbc_shutdown();
     // dont send pulse
     return;
   }
+
+	/* NOW: (delay - tick) >= OVBC_CHIP_ENABLE_TIME */
 
   // trim period time between curtick and Rtick
   delay -= tick;
