@@ -206,7 +206,7 @@ static void ble_startup(void)
 {
   // use NRESET pin of RSL10 chip to wakeup RSL10 if magnethall exist(Rising edge)
   HAL_GPIO_WritePin(CCM_PIN18_RSL10_RST_GPIO_Port, CCM_PIN18_RSL10_RST_Pin, GPIO_PIN_RESET);
-  HAL_Delay(10);
+  HAL_Delay(5);
   HAL_GPIO_WritePin(CCM_PIN18_RSL10_RST_GPIO_Port, CCM_PIN18_RSL10_RST_Pin, GPIO_PIN_SET);
 }
 
@@ -1304,7 +1304,7 @@ static void ble_smReqWaiting(void)
   // still in this status? query loop continue
   if(ble_status == ble_reqWaiting_status){
 
-#ifdef LiuJH_DEBUG // only test: dont sleep
+#ifndef LiuJH_DEBUG // only test: dont sleep
     // current status is timeout?
     if(HAL_GetTick() > ble_timeoutTick){
       // loop in this status if we are charging

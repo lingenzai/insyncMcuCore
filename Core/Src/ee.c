@@ -68,7 +68,7 @@ static bool ee_writeData(u32 _addr, u8 *_pdata, u32 _len)
   while(_len){
     HAL_FLASHEx_DATAEEPROM_Program(ee_byte_type, _addr++, *_pdata++);
     _len--;
-    HAL_Delay(5);
+//    HAL_Delay(5);
   }
   HAL_FLASHEx_DATAEEPROM_Lock();
 
@@ -216,7 +216,7 @@ bool ee_storeKeyValue(ee_keyvalue_typeDef _key)
   ee_writeData(addr, pdata, len);
 
   // the last data write time delay, need it???
-  HAL_Delay(2);
+//  HAL_Delay(2);
 
   return ret;
 }

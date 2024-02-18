@@ -543,8 +543,6 @@ void mcu_allStateMachine(void)
 
   // pulse state machine process
   pulse_StateMachine();
-  // start state machine
-  ovbc_stateMachine();
 
   // ACCEL state machine process
   accel_stateMachine();

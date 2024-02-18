@@ -612,6 +612,11 @@ static void ecg_smRnWaiting2(void)
 	ecg_initBuf();
 #endif
 
+#ifndef LiuJH_OVBC
+	// test only
+	pulse_bleConfigPulseOn(true);
+#endif
+
   // calculate R2 tick
   ecg_Rtick[chIndex] = ecg_bufFirstTick[chIndex] + ((ecg_Rdetected[chIndex] - 1) * ecg_RPPiTimeUs[chIndex]) / 1000;
 

@@ -75,7 +75,7 @@ static bool accel_configReg(void)
     goto error;
 
   // need it???
-  HAL_Delay(10);
+//  HAL_Delay(10);
 
 	// set INT ENABLE.
   if(!accel_writeRegValue(REG_ADDR_CTRL7, CTRL7_INT_ENABLE))
@@ -114,7 +114,7 @@ static bool accel_resetAllReg(void)
 
   ret = accel_writeRegValue(REG_ADDR_CTRL2, CTRL2_RESET_VALUE);
   // wait boot
-  HAL_Delay(5);
+//  HAL_Delay(5);
 
   return ret;
 #endif
@@ -136,7 +136,7 @@ static bool accel_rebootChip(void)
   ret = accel_writeRegValue(REG_ADDR_CTRL2,CTRL2_BOOT_VALUE);
 
   // wait boot; need it???
-  HAL_Delay(5);
+//  HAL_Delay(5);
 
   return ret;
 #endif
