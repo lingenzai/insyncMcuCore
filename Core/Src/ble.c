@@ -1304,7 +1304,7 @@ static void ble_smReqWaiting(void)
   // still in this status? query loop continue
   if(ble_status == ble_reqWaiting_status){
 
-#ifndef LiuJH_DEBUG // only test: dont sleep
+#ifdef LiuJH_DEBUG // only test: dont sleep
     // current status is timeout?
     if(HAL_GetTick() > ble_timeoutTick){
       // loop in this status if we are charging
