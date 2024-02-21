@@ -206,6 +206,10 @@ static void ble_startup(void)
 {
   // use NRESET pin of RSL10 chip to wakeup RSL10 if magnethall exist(Rising edge)
   HAL_GPIO_WritePin(CCM_PIN18_RSL10_RST_GPIO_Port, CCM_PIN18_RSL10_RST_Pin, GPIO_PIN_RESET);
+	/*
+		This function will be called when ble init or charging is FULL of wpr;
+		Doesn't affect ecg and pulse; SO keep this delay;
+	*/
   HAL_Delay(5);
   HAL_GPIO_WritePin(CCM_PIN18_RSL10_RST_GPIO_Port, CCM_PIN18_RSL10_RST_Pin, GPIO_PIN_SET);
 }
@@ -325,7 +329,7 @@ static void ble_reqWriteAccelCfg(u8 _reqId)
   ble_respUserReqOkOrErr(_reqId, true);
 
   // store this key value into EEPROM
-  ee_storeKeyValue(ee_kv_motionPeriod);
+  ee_readOrWriteKeyValue(ee_kv_motionPeriod, false);
 }
 
 /*
@@ -353,6 +357,48 @@ static void ble_reqReadAccelCfg(u8 _reqId)
   *ptx++ = (u8)(pm->mcu_motionPeriod & 0xFF);
   *ptx++ = (u8)(pm->mcu_motionThreshold >> 8);
   *ptx++ = (u8)(pm->mcu_motionThreshold & 0xFF);
+
+  // length
+  num = ptx - ble_spiTxBuf;
+
+  // check xor
+  ptx = ble_spiTxBuf + SPI_SEND_NUM - 1;
+  *ptx = 0;
+  for(u32 i = 0; i < num; i++){
+    *ptx ^= ble_spiTxBuf[i];
+  }
+
+  // send the response to RSL10 through SPI in blocked mode
+  BLE_CS_ASSERTED;
+  HAL_SPI_Transmit(&hspi2, ble_spiTxBuf, len, BLE_SPI_TIMEOUT);
+  BLE_CS_DEASSERTED;
+}
+
+/*
+  brief:
+    1. D1-D4: pulse num;
+*/
+static void ble_req_readBaseData(u8 _reqId)
+{
+  u32 pulsenum  = mcu_getBaseData()->mcu_pulseTotalNum;
+  u8 *ptx = ble_spiTxBuf;
+  u16 len = sizeof(ble_spiTxBuf);
+  u32 num = 0;
+
+  // clear txbuf
+  memset(ptx, 0, len);
+
+  /* 1. send pulse num to RSl10 through SPI; */
+  // head
+  *ptx++ = BLE_P_HEAD;
+  // command id
+  *ptx++ = _reqId;
+
+  // pad value
+  *ptx++ = (u8)(pulsenum >> 24);
+  *ptx++ = (u8)(pulsenum >> 16);
+  *ptx++ = (u8)(pulsenum >> 8);
+  *ptx++ = pulsenum;
 
   // length
   num = ptx - ble_spiTxBuf;
@@ -407,7 +453,7 @@ static void ble_reqWritePulseHolidayDt(u8 _reqId)
   ble_respUserReqOkOrErr(_reqId, true);
 
   // store this key value into EEPROM
-  ee_storeKeyValue(ee_kv_unpulsingPeriod);
+  ee_readOrWriteKeyValue(ee_kv_unpulsingPeriod, false);
 }
 
 /*
@@ -483,7 +529,7 @@ static void ble_reqWritePulseVoutSetStatus(u8 _reqId)
   ble_respUserReqOkOrErr(_reqId, isOK);
 
   // store this key value into EEPROM
-  ee_storeKeyValue(ee_kv_VoutSet);
+  ee_readOrWriteKeyValue(ee_kv_VoutSet, false);
 }
 
 /*
@@ -724,13 +770,15 @@ static void ble_reqWritePulseConfig(u8 _reqId)
   pconfig->pulse_Rsvi_ms = *prx++;
 
   // set data valid flag
-  pconfig->pulse_configIsValid = MCU_DATA_STRUCT_VALID_VALUE;
+//  pconfig->pulse_configIsValid = MCU_DATA_STRUCT_VALID_VALUE;
 
   // response RSL10
   ble_respUserReqOkOrErr(_reqId, true);
 
   // store this key value into EEPROM
-  ee_storeKeyValue(ee_kv_pulseConfig);
+//  ee_readOrWriteKeyValue(ee_kv_pulseConfig, false);
+
+	// store all param after config2 and config3 is OK
 }
 
 /*
@@ -987,7 +1035,10 @@ static void ble_dealReqCommand(void)
     case ble_p_write_pulseHolidayDt:
       ble_reqWritePulseHolidayDt(reqid);
       break;
-
+    // RSL10 read base data(0x36)
+    case ble_p_read_baseData:
+      ble_req_readBaseData(reqid);
+      break;
 
     // RSL10 read twins channel ecg data(0x37)
     case ble_p_read_RtEcg_twins:

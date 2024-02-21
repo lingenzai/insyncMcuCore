@@ -11,6 +11,10 @@
 /* define ----------------------------------------------------------------- */
 
 
+#ifndef LiuJH_DEBUG
+#define LiuJH_EE
+#endif
+
 
 #define ee_word_type                  FLASH_TYPEPROGRAMDATA_WORD
 #define ee_half_word_type             FLASH_TYPEPROGRAMDATA_HALFWORD
@@ -39,6 +43,10 @@
 #define ee_addr_motionPeriod_size     (sizeof(mcu_MotionConfig_typeDef))
 #define ee_addr_motionPeriod_end      (ee_addr_motionPeriod + ee_addr_motionPeriod_size -1)
 
+// base data in EERPOM
+#define ee_addr_baseData              (ee_addr_motionPeriod_end + 1)
+#define ee_addr_baseData_size         (sizeof(mcu_baseData_typeDef))
+#define ee_addr_baseData_end          (ee_addr_baseData + ee_addr_baseData_size - 1)
 
 
 
@@ -47,10 +55,11 @@
 /* type define ----------------------------------------------------------- */
 
 typedef enum{
-  ee_kv_pulseConfig,
+  ee_kv_pulseConfig = 0,
   ee_kv_unpulsingPeriod,
   ee_kv_VoutSet,
   ee_kv_motionPeriod,
+  ee_kv_baseData,
 
 
   ee_kv_max
@@ -58,7 +67,8 @@ typedef enum{
 
 
 /* extern public function ------------------------------------------------- */
+extern bool ee_storeKeyValue(void);
 extern bool ee_restoreKeyValue(void);
-extern bool ee_storeKeyValue(ee_keyvalue_typeDef _key);
+extern bool ee_readOrWriteKeyValue(ee_keyvalue_typeDef _key, bool _isRead);
 
 #endif /* INC_EE_H_ */

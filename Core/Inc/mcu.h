@@ -137,6 +137,18 @@ typedef struct{
   u16 mcu_motionThreshold;  
 } mcu_MotionConfig_typeDef;
 
+/*
+*/
+typedef struct{
+  u8 isValid;
+
+
+  // pulse sent total num
+  u32 mcu_pulseTotalNum;
+
+
+} mcu_baseData_typeDef;
+
 
 extern SPI_HandleTypeDef hspi2;
 extern ADC_HandleTypeDef hadc;
@@ -161,9 +173,11 @@ extern void mcu_unlockSpi(void);
 extern bool mcu_tryLockSpi(u8 _devID);
 extern mcu_Voutset_typeDef *mcu_getVoutset(void);
 extern mcu_MotionConfig_typeDef *mcu_getMotionCfg(void);
+extern mcu_baseData_typeDef *mcu_getBaseData(void);
 extern void mcu_setVoutsetPin(u8 _setvalue);
 extern void mcu_calibrateVoutset(void);
 extern void mcu_calibrateMotionPeriod(void);
+extern void mcu_calibrateBaseData(void);
 extern void mcu_TIM6_periodElapsedCB(TIM_HandleTypeDef *htim);
 
 

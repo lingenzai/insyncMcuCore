@@ -612,7 +612,7 @@ static void ecg_smRnWaiting2(void)
 	ecg_initBuf();
 #endif
 
-#ifndef LiuJH_OVBC
+#ifdef LiuJH_OVBC
 	// test only
 	pulse_bleConfigPulseOn(true);
 #endif
@@ -693,19 +693,6 @@ static void ecg_smRnWaiting(void)
   		1. MUST one channel is NOT OK;
   		2. check Rs channel at first;
   */
-
-#ifndef LiuJH_DEBUG
-	/* need NOT update data */
-
-  // pull u16 adc value from Rs and Rv buf and convert to byte and store into buf again
-  if(ecg_pollAdcValue(&chIndex, &adcValue)){
-    /* ignore channel num, only compare */
-    ecg_filterPeakValue(adcValue);
-
-  // convert u16 to u8 and store into Rs buf
-    ecg_convAdcValueToByte(chIndex, adcValue, true);
-  }
-#endif
 
   // process Rs at first
   if(ecg_Rok[chIndex])

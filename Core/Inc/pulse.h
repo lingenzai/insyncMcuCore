@@ -44,7 +44,7 @@
 #define UNPULSING_PERIOD_END_H_DEFAULT    0
 #define UNPULSING_PERIOD_END_MI_DEFAULT   0
 // (((24 * 12 + 2) * 31 + 18) * 24 + 0) * 60 + 0 = 12,971,520 ( 0x00 C5 EE 00 )
-#define UNPULSING_PERIOD_END_DT_DEFAULT    (0x00C5EE00)
+#define UNPULSING_PERIOD_END_DT_DEFAULT   (0x00C5EE00)
 
 /*
   1. store config params from USER;

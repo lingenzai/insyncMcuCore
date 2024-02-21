@@ -98,7 +98,8 @@ typedef enum{
   ble_p_read_pulseHolidayDt,
   // RSL10 write pulse holiday date&time(0x35)
   ble_p_write_pulseHolidayDt,
-
+  // RSL10 read base data(0x36)
+  ble_p_read_baseData,
 
   // RSL10 read twins channel ecg data(0x37)
   ble_p_read_RtEcg_twins = 0x37,

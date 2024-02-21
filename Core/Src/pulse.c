@@ -261,6 +261,9 @@ static void pulse_smWaitingProc(void)
     // start up pulsing
     ovbc_startup();
 
+    // record pulse total num
+    mcu_getBaseData()->mcu_pulseTotalNum++;
+
     // update status
     pulse_status = pulse_pulsing_status;
   }
@@ -442,6 +445,9 @@ void pulse_calibrateUnpulsingPeriod(void)
 
     // set valid
     p->isValid = MCU_DATA_STRUCT_VALID_VALUE;
+
+		// store this key value into EEPROM
+		ee_readOrWriteKeyValue(ee_kv_unpulsingPeriod, false);
   }
 }
 

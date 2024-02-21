@@ -29,9 +29,9 @@ Data Format:
              06 - Vout float status*/
 static mcu_Voutset_typeDef mcu_Voutset;
 
-
 //static u32 mcu_tick = 0;
 
+static mcu_baseData_typeDef mcu_baseData;
 
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private var define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
@@ -233,8 +233,14 @@ static void mcu_workDriven(void)
   if(HAL_GetTick() < mcu_motionTick) return;
 
   accel_startup();
+
+#ifndef LiuJH_DEBUG
+	// test only
+	mcu_motionTick = HAL_GetTick() + TIMEOUT_5S;
+#else
   // set next startup timetick
   mcu_motionTick = HAL_GetTick() + mcu_motionCfg.mcu_motionPeriod * 1000;
+#endif
 }
 
 /*
@@ -244,7 +250,13 @@ static void mcu_workDriven(void)
 */
 static void mcu_storeKeyValue(void)
 {
-//  ee_storeKeyValue();
+#ifdef LiuJH_EE
+	// test only: entering into LPM may failed after writing EE
+  ee_storeKeyValue();
+#endif
+
+  // store pulse total number into eeprom
+  ee_readOrWriteKeyValue(ee_kv_baseData, false);
 }
 
 /*
@@ -333,7 +345,7 @@ static void mcu_enterStandbyMode(void)
 {
 #ifndef LiuJH_DEBUG
   // test only for LPM
-
+	mcu_setLpmWakeupTimer();
 #else
 
   /* NOW: we can go into LPM */
@@ -627,6 +639,9 @@ void mcu_calibrateMotionPeriod(void)
 
     // set valid
     p->isValid = MCU_DATA_STRUCT_VALID_VALUE;
+
+		// store this key value into EEPROM
+		ee_readOrWriteKeyValue(ee_kv_motionPeriod, false);
   }
 }
 
@@ -645,10 +660,30 @@ void mcu_calibrateVoutset(void)
 
     // set valid
     p->isValid = MCU_DATA_STRUCT_VALID_VALUE;
+
+		// store this key value into EEPROM
+		ee_readOrWriteKeyValue(ee_kv_VoutSet, false);
   }
 
   // NOTICE: config init this pin again
   mcu_setVoutsetPin((u8)p->value);
+}
+
+/*
+*/
+void mcu_calibrateBaseData(void)
+{
+  mcu_baseData_typeDef *p = &mcu_baseData;
+
+  // unvalid? set default
+  if(p->isValid ^ MCU_DATA_STRUCT_VALID_VALUE){
+    p->mcu_pulseTotalNum = 0;
+
+    p->isValid = MCU_DATA_STRUCT_VALID_VALUE;
+
+    // store this key value into EEPROM
+    ee_readOrWriteKeyValue(ee_kv_baseData, false);
+  }
 }
 
 /*
@@ -667,6 +702,13 @@ Data Format:
 mcu_Voutset_typeDef *mcu_getVoutset(void)
 {
   return &mcu_Voutset;
+}
+
+/*
+*/
+mcu_baseData_typeDef *mcu_getBaseData(void)
+{
+  return &mcu_baseData;
 }
 
 /*
