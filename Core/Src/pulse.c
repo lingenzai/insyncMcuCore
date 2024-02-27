@@ -33,6 +33,9 @@ static bool pulse_ecgPulsingOn;
 // APP ask pulse ON/OFF(default: OFF)
 static bool pulse_blePulsingOn;
 
+// record pulse config time index of group
+static int pulse_conTimeIndex;
+
 
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private var define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
@@ -88,7 +91,9 @@ static bool pulse_isPulseTime(void)
   return true;
 #else
   bool ret = false;
+	// current time is m1, and pulse time is m2;(unit: minute)
   u32 m1, m2;
+	int i;
 
   // get current date and time
   HAL_RTC_GetTime(&hrtc, &mcu_time, RTC_FORMAT_BIN);
@@ -112,18 +117,26 @@ static bool pulse_isPulseTime(void)
   /* compare pulsing time of every day */
 
   // dont need send pulse?
-  if(pulse_config.pulse_start_time == pulse_config.pulse_end_time){
-    return ret;
+  if(pulse_config.pulse_timeNum == 0){
+		return ret;
   }
 
-  // current time convert to Minutes
-  m1 = mcu_time.Hours * 60 + mcu_time.Minutes;
-  m2 = pulse_config.pulse_start_time;
+	// current time convert to Minutes
+	m1 = mcu_time.Hours * 60 + mcu_time.Minutes;
 
-  // compare time(unit: minutes)
-  if(m1 == m2 || m1 == pulse_getLastMinute(m2) || m1 == pulse_getNextMinute(m2)){
-    ret = true;
-  }
+	// get all start time of pulse config time and compare
+	for(i = 0; i < pulse_config.pulse_timeNum; i++){
+		// get time
+		m2 = pulse_config.pulse_timeBuf[i].startTime;
+
+		// compare time(unit: minutes)
+		if(m1 == m2 || m1 == pulse_getLastMinute(m2) || m1 == pulse_getNextMinute(m2)){
+			// record this index for calculating work time
+			pulse_conTimeIndex = i;
+			ret = true;
+			break;
+		}
+	}
 
   return ret;
 #endif
@@ -139,7 +152,7 @@ static bool pulse_isInnerPeace()
   // test only for pulse
   return true;
 #else
-  return ecg_getBpm() < PULSING_BPM_CALM_MAX;
+  return ecg_getBpm() < mcu_getBpmCalMax()->mcu_bpmCalmMax;
 #endif
 }
 
@@ -282,7 +295,8 @@ pulse_smWaitingProcEnd:
 */
 static void pulse_smStartupProc(void)
 {
-  u32 minutes = 0;
+  u32 minutes;
+	pulse_time_typeDef *p = pulse_config.pulse_timeBuf + pulse_conTimeIndex;
 
   pulse_init();
   pulseIsWorking = true;
@@ -293,15 +307,14 @@ static void pulse_smStartupProc(void)
 #ifndef LiuJH_DEBUG
   minutes = 1;
 #else
-  // get pulse work seconds
-  if(pulse_config.pulse_end_time < pulse_config.pulse_start_time)
-    minutes = MCU_MAX_MINUTE_EACH_DAY + pulse_config.pulse_end_time - pulse_config.pulse_start_time;
+	// calculate working time(unit: minute)
+  if(p->endTime < p->startTime)
+    minutes = MCU_MAX_MINUTE_EACH_DAY + p->endTime - p->startTime;
   else
-    minutes = pulse_config.pulse_end_time - pulse_config.pulse_start_time;
+    minutes = p->endTime - p->startTime;
 #endif
   // get tick(unit: ms)
   pulse_workOverTick = HAL_GetTick() + minutes * 60 * 1000;
-//  pulse_workOverTick = HAL_GetTick() + (minutes+60) * 60 * 1000;
 
   pulse_status = pulse_waiting_status;
 }
@@ -468,15 +481,56 @@ void pulse_calibrateConfig(void)
 
   // unvalid?
   if(p->pulse_configIsValid ^ MCU_DATA_STRUCT_VALID_VALUE){
+    memset((void *)p, 0, sizeof(ppulse_config_typeDef));
+
     p->pulse_Rsvi_ms = PULSE_RSVI_DELAY_MS_DEFAULT;
     p->pulse_Rv_delay_ms = PULSE_RV_DELAY_MS_DEFAULT;
     p->pulse_num = PULSE_NUM_DEFAULT;
     p->pulse_width = PULSE_WIDTH_DEFAULT;
-    p->pulse_start_time = PULSE_START_TIME_DEFAULT;
-    p->pulse_end_time = PULSE_END_TIME_DEFAULT;
+
+		// set all pulse time default time
+		for(int i = 0; i < PULSE_TIME_BUF_SIZE - 1; i++){
+#ifdef LiuJH_DEBUG
+		// Test only(test code when we have six pulse time period)
+		/*
+			six pulse time period group is:
+					[00:00, 01:00], [04:00, 05:00], [08:00, 09:00], [12:00, 13:00], [16:00, 17:00], [20:00, 21:00]
+			convert these to minutes is:
+					[0    , 60   ], [240  , 300  ], [480  , 540  ], [720  , 780  ], [960  , 1020 ], [1200 , 1800 ]
+		*/
+//		p->pulse_timeBuf[i].startTime = i * 4 * 60;
+		/*
+			five pulse time period group is:
+					[00:00, 01:00], [04:48, 05:48], [09:36, 10:36], [14:24, 15:24], [19:12, 20:12]
+			convert these to minutes is:
+					[0    , 60   ], [288  , 348  ], [576  , 636  ], [864  , 924  ], [1152  , 1212]
+		*/
+		p->pulse_timeBuf[i].startTime = i * 288;
+		p->pulse_timeBuf[i].endTime = p->pulse_timeBuf[i].startTime + 60;
+#else
+			p->pulse_timeBuf[i].startTime = PULSE_START_TIME_DEFAULT;
+			p->pulse_timeBuf[i].endTime = PULSE_END_TIME_DEFAULT;
+#endif
+		}
+#ifdef LiuJH_DEBUG
+		// test only ( we have six pulse time period groups)
+		p->pulse_timeNum = PULSE_TIME_BUF_SIZE;
+#else
+		p->pulse_timeNum = PULSE_TIME_NUM_DEFAULT;
+#endif
+
+#ifndef LiuJH_DEBUG
+		// test only(test code when we have one pulse time period)
+		p->pulse_timeBuf[0].startTime = 0;
+		p->pulse_timeBuf[0].endTime = 1 * 60;
+		p->pulse_timeNum = 1;
+#endif
 
     // set valid
     p->pulse_configIsValid = MCU_DATA_STRUCT_VALID_VALUE;
+
+		// store this key value into EEPROM
+		ee_readOrWriteKeyValue(ee_kv_pulseConfig, false);
   }
 }
 
@@ -492,6 +546,7 @@ void pulse_init(void)
   pulse_workOverTick = 0;
   pulse_ecgPulsingOn = false;
   pulse_blePulsingOn = false;
+	pulse_conTimeIndex = 0;
 
   ovbc_init();
 

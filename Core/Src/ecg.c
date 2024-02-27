@@ -51,6 +51,8 @@ static u32 ecg_bpm[ECG_ADC_CH_NUM];
 static u32 ecg_RsviTimeMs;
 // record Rn window min point num and max point num
 static u32 ecg_RnWmin, ecg_RnWmax;
+// half point of (bpm - 5) and (bpm + 5)
+static u32 ecg_RnHalfWeight;
 
 
 // record num of Rn detected
@@ -67,6 +69,8 @@ static u32 ecg_adcTrimPeakTick;
 // trim RDET adc sample some times at first
 // and then it is flag of the first data tick in buffer
 static u32 ecg_adcStableTick;
+// record redo because too little bpm
+static bool ecg_detectAgain;
 
 
 /* private fuction define *****************************************/
@@ -227,6 +231,8 @@ static void ecg_init2(void)
   ecg_RnDetected = 0;
   ecg_RnEscaped = 0;
   ecg_RnEscapedAll = 0;
+
+  ecg_detectAgain = false;
 }
 
 /*
@@ -355,6 +361,35 @@ static void ecg_cbStoreWordToBuf(u8 _chIndex, i32 _iValue)
     ecg_bufLastTick[_chIndex] = HAL_GetTick();
 }
 
+/*
+  brief:
+    1. weight = 60000 * (1/(bpm - 5) - 1/(bpm + 5)) / 2;
+    2. So is: weight = 300000 / ((bpm - 5)(bpm + 5));unit is: ms
+    3. We want points, So weight = (weight + 2) >> 2;
+    4. So is: weight = (300000 / ((bpm - 5)(bpm + 5)) + 2) >> 2;
+    5. 60000 is 1minute-->number of ms;
+    6. the MIN move window is 10 points;
+*/
+static u32 ecg_calRnWinWeight(void)
+{
+  u32 ret = ECG_Rn_MW_HALF_SIZE;
+  u32 m = 300000;
+  u32 b = (ecg_bpm[ECG_RS_INDEX] - ECG_BPM_WEIGHT)*(ecg_bpm[ECG_RS_INDEX] + ECG_BPM_WEIGHT);
+
+  // check bpm and b is valid
+  if(!ecg_bpm[ECG_RS_INDEX] || b == 0) return ret;
+
+  // calculate move window value
+//  b = (m / b + 2) >> 2;
+  b = (m / b + 2) >> 2;
+
+  // use it?
+  if(b > ret)
+    ret = b;
+
+  return ret;
+}
+
 
 /*
   brief:
@@ -376,9 +411,12 @@ static void ecg_smRnDetected(void)
 		if escape, we assum the four is Rn(because of set is (min, max]);
 	*/
 
+  // update Rn weight using the newest bpm
+  ecg_RnHalfWeight = ecg_calRnWinWeight();
+
 	// is escape?
 	if(ecg_RnEscaped){
-		ecg_Rdetected[chIndex] = ECG_Rn_MW_HALF_SIZE;
+		ecg_Rdetected[chIndex] = ecg_RnHalfWeight;  // ECG_Rn_MW_HALF_SIZE;
 	}else{
 		/*
 			1. off of R peak point in buf is: (ecg_bufBnum - 2);
@@ -396,8 +434,8 @@ static void ecg_smRnDetected(void)
 #endif
 
 	// get Rn window min and max point num
-	ecg_RnWmin = ecg_RRiPointNum[chIndex] - ECG_Rn_MW_HALF_SIZE;
-	ecg_RnWmax = ecg_RRiPointNum[chIndex] + ECG_Rn_MW_HALF_SIZE;
+	ecg_RnWmin = ecg_RRiPointNum[chIndex] - ecg_RnHalfWeight; // ECG_Rn_MW_HALF_SIZE;
+	ecg_RnWmax = ecg_RRiPointNum[chIndex] + ecg_RnHalfWeight; // ECG_Rn_MW_HALF_SIZE;
 
 #ifdef LiuJH_DEBUG
 	/*
@@ -428,7 +466,7 @@ static void ecg_cbSmRnDetect(u8 _chIndex, i32 _adcValue)
   if(_chIndex) return;
 
   // record enough data?
-  if(ecg_Rdetected[_chIndex] >= ecg_RnWmax){
+  if(ecg_bufWnum[_chIndex] > (ecg_RnHalfWeight << 1)){
   	return;
   }
 
@@ -446,8 +484,8 @@ static void ecg_cbSmRnDetect(u8 _chIndex, i32 _adcValue)
   ecg_cbStoreWordToBuf(ECG_RV_INDEX, (u16)(tick >> 16));
   ecg_cbStoreWordToBuf(ECG_RV_INDEX, (u16)tick);
 
-  // for next loop
-  ecg_Rdetected[_chIndex]++;
+  // for next loop  // update in ecg_smRnDetect
+//  ecg_Rdetected[_chIndex]++;
 }
 
 /*
@@ -467,32 +505,47 @@ static void ecg_smRnDetect(void)
 	u32 offb = 0, tick1, tick2, tick3, tick4;
 	bool found = false;
 
+  // We have data?
+  if(ecg_bufWnum == 0) return;
+
 	// exist new u16 data in Rs buf? got it and convert byte and store into Rs buf
 	if(ecg_bufWnum[chIndex] > ecg_bufBnum[chIndex]){
-	// pull MSB of u16
-	adcValue = ps[ecg_bufBoff[chIndex]++];
-	// pull LSB of u16
-	adcValue = (adcValue << 8) | ps[ecg_bufBoff[chIndex]++];
+  	// pull MSB of u16
+  	adcValue = ps[ecg_bufBoff[chIndex]++];
+  	// pull LSB of u16
+  	adcValue = (adcValue << 8) | ps[ecg_bufBoff[chIndex]++];
 
-	// convert u16 to u8 and store into Rs buf
-	ecg_convAdcValueToByte(chIndex, adcValue, true);
+  	// convert u16 to u8 and store into Rs buf
+  	ecg_convAdcValueToByte(chIndex, adcValue, true);
 	}
 
 	// we have enough byte to detect Rn?
-	if(ecg_bufBnum[chIndex] < ECG_RN_DETECT_NUM) return;
+	if(ecg_bufBnum[chIndex] < ECG_RN_DETECT_NUM){
+    // loop waiting next data
+    return;
+  }
+
+  // we have new data for detecting?
+  if(ecg_bufBnum[chIndex] + ecg_RnWmin <= ecg_Rdetected[chIndex]) return;
+
+  // the first detection for this Rn peak point?
+  if(ecg_Rdetected[chIndex] == ecg_RnWmin){
+    // ignore the first two point detected
+    ecg_Rdetected[chIndex] += (ECG_RN_DETECT_NUM - 1);
+  }
 
 	/*
-	NOW:
-	  1. We have ECG_RN_DETECT_NUM data at least: A B C D (E F);
-	  2. R: is more than RnValueV and more than both prev and next data(cur byte);
-	  3. if Rndetected num more than RnWmax, escape;
-	  4. if B == C, B must bigger than D;
+  	NOW:
+  	  1. We have ECG_RN_DETECT_NUM data at least: A B C (D E F);
+  	  2. R: is more than RnValueV and more than both prev and next data(cur byte);
+  	  3. if Rndetected num more than RnWmax, escape;
 	*/
 
 	// get the newest three data for compare
-	aOff = ecg_bufBnum[chIndex] - ECG_RN_DETECT_NUM;
-	bOff = ecg_bufBnum[chIndex] - ECG_RN_DETECT_NUM + 1;
-	cOff = ecg_bufBnum[chIndex] - ECG_RN_DETECT_NUM + 2;
+	cOff = ecg_Rdetected[chIndex] - ecg_RnWmin;
+	bOff = cOff - 1;
+	aOff = bOff - 1;
+  // get these points value
 	aPoint = ps[aOff];
 	bPoint = ps[bOff];
 	cPoint = ps[cOff];
@@ -527,12 +580,29 @@ static void ecg_smRnDetect(void)
 			// clear escaped continued
 			ecg_RnEscaped = 0;
 
-			// Need trim current RRi or NOT???
-			offb = ecg_RnWmin + bOff;
-			if(ecg_RRiPointNum[chIndex] != offb){
-				offb += ecg_RRiPointNum[chIndex];
-				ecg_RRiPointNum[chIndex] = offb >> 1;
-			}
+      // Need update bpm and RRiTimeMs and RRiPointNum?
+      offb = ecg_RnWmin + bOff;
+      if(ecg_RRiPointNum[chIndex] != offb){
+        u32 ms = (offb * ecg_RPPiTimeUs[chIndex]) / 1000;
+//        ecg_RRiTimeMs[chIndex] = (offb * ecg_RPPiTimeUs[chIndex]) / 1000;
+        if(ms){
+          u32 b = (60 * 1000) / ms;
+          if(b > ecg_bpm[chIndex] + ECG_BPM_WEIGHT || b + ECG_BPM_WEIGHT < ecg_bpm[chIndex]){
+            /* bpm changes too much, redo again */
+
+            // adc stable tick
+            ecg_adcStableTick = HAL_GetTick() + ADC_WORKING_STABLE_TIME;
+            // startup again
+            ecg_status = ecg_startup_status;
+            return;
+          }else{
+            ecg_RRiPointNum[chIndex] = offb;
+            ecg_RRiTimeMs[chIndex] = ms;
+            // update this bpm
+            ecg_bpm[chIndex] = b;
+          }
+        }
+      }
 
 #ifndef LiuJH_DEBUG
 			// toast ble this tick of R peak point detected
@@ -560,13 +630,17 @@ static void ecg_smRnDetect(void)
 	3. escape?
 	*/
 
+  // for next loop detection
+  (ecg_Rdetected[chIndex])++;
+
 	// escape?
-	if(!found && ecg_Rdetected[chIndex] >= ecg_RnWmax && ecg_bufBnum[chIndex] >= ecg_bufWnum[chIndex]){
+	if(!found && ecg_Rdetected[chIndex] >= ecg_RnWmax){
 		// record Rn detected and escaped num
 		ecg_RnDetected++;
 		ecg_RnEscaped++;
 		ecg_RnEscapedAll++;
 
+#ifndef LiuJH_DEBUG
 		// twice continue escaped? restart R1 waiting...
 		if(ecg_RnEscaped >= ECG_ESCAPED_MAX_NUM){
 		  // redo R detect, restart up ecg detection
@@ -575,6 +649,10 @@ static void ecg_smRnDetect(void)
 		  // for next Rn detect, go into next status for sync buf vars
 		  ecg_status = ecg_RnDetected_status;
 		}
+#else
+    // redo R detect, restart up ecg detection
+    ecg_status = ecg_startup_status;
+#endif
 	}
 }
 
@@ -598,9 +676,11 @@ static void ecg_smRnWaiting2(void)
       3. we only detect Rs-RDET;
   */
 
-	// get Rn window min and max point num
-	ecg_RnWmin = ecg_RRiPointNum[chIndex] - ECG_Rn_MW_HALF_SIZE;
-	ecg_RnWmax = ecg_RRiPointNum[chIndex] + ECG_Rn_MW_HALF_SIZE;
+  ecg_RnHalfWeight = ecg_calRnWinWeight();  // ECG_Rn_MW_HALF_SIZE; // 
+
+  // get Rn window min and max point num
+  ecg_RnWmin = ecg_RRiPointNum[chIndex] - ecg_RnHalfWeight; // ECG_Rn_MW_HALF_SIZE; // 
+  ecg_RnWmax = ecg_RRiPointNum[chIndex] + ecg_RnHalfWeight; // ECG_Rn_MW_HALF_SIZE; //
 
 #ifdef LiuJH_DEBUG
 	/*
@@ -666,25 +746,30 @@ static void ecg_smRnWaiting(void)
 
   // Both of Rs and Rv channel finished? go into next status
   if(ecg_Rok[ECG_RS_INDEX] && ecg_Rok[ECG_RV_INDEX]){
-  	u32 n1 = ecg_RRiPointNum[ECG_RS_INDEX], n2 = ecg_RRiPointNum[ECG_RV_INDEX];
+//  	u32 n1 = ecg_RRiPointNum[ECG_RS_INDEX], n2 = ecg_RRiPointNum[ECG_RV_INDEX];
+//    u32 n1 = ecg_bpm[ECG_RS_INDEX], n2 = ecg_bpm[ECG_RV_INDEX];
 
     // clear static var for next detect
     ecg_Rok[ECG_RS_INDEX] = ecg_Rok[ECG_RV_INDEX] = false;
 
     // check bpm of Rs and Rv is equal?
-//    if(ecg_bpm[ECG_RS_INDEX] == ecg_bpm[ECG_RV_INDEX]){
-	// check RRiPointNum
-	if(n1 == n2 || n1 == n2 + 1 || n1 + 1 == n2){
-		/* NOW: we can calculate Rs_Rv delay time(unit: ms) */
-		ecg_calculateRsvi();
+//    if(n1 + ECG_BPM_WEIGHT > n2 || n2 + ECG_BPM_WEIGHT > n1){
+    	// check RRiPointNum
+//    if(n1 == n2 || n1 == n2 + 1 || n1 + 1 == n2){
+  		/* NOW: we can calculate Rs_Rv delay time(unit: ms) */
+  		ecg_calculateRsvi();
 
-		// got into next status for Rn detection
-		ecg_status = ecg_Rnwaiting2_status;
+      // for next redo because of little bpm
+      ecg_detectAgain = false;
+
+  		// got into next status for Rn detection
+  		ecg_status = ecg_Rnwaiting2_status;
+/*
     }else{
-		// restart detect both of Rs and Rv channel
-		ecg_status = ecg_startup_status;
+  		// restart detect both of Rs and Rv channel
+  		ecg_status = ecg_startup_status;
     }
-
+*/
     return;
   }
 
@@ -719,8 +804,14 @@ static void ecg_smRnWaiting(void)
     if(ecg_RRiTimeMs[chIndex])
       ecg_bpm[chIndex] = (60 * 1000) / ecg_RRiTimeMs[chIndex];
 
-    // update finished flag
-    ecg_Rok[chIndex] = true;
+    // need redo because of more little bpm value?
+    if(!ecg_detectAgain && ecg_bpm[chIndex] < ECG_BPM_MIN){
+      ecg_detectAgain = true;
+      ecg_status = ecg_startup_status;
+    }else{
+      // update finished flag
+      ecg_Rok[chIndex] = true;
+    }
   }
 }
 

@@ -25,6 +25,7 @@
 // dont pulse default(00:00 - 00:00) convert minutes
 #define PULSE_START_TIME_DEFAULT    0
 #define PULSE_END_TIME_DEFAULT      0
+#define PULSE_TIME_NUM_DEFAULT			0
 
 
 // format: YY:MM:DD-HH:MM convert minutes: (((YY * 12 + MM) * 31) * 24 + HH) * 60
@@ -46,6 +47,18 @@
 // (((24 * 12 + 2) * 31 + 18) * 24 + 0) * 60 + 0 = 12,971,520 ( 0x00 C5 EE 00 )
 #define UNPULSING_PERIOD_END_DT_DEFAULT   (0x00C5EE00)
 
+// up to six groups of pulse time(start time and end time)
+#define PULSE_TIME_BUF_SIZE							6
+#define PULSE_TIME_CONFIG3_INDEX					3
+
+
+/*
+*/
+typedef struct{
+	u16 startTime;
+	u16 endTime;
+} pulse_time_typeDef;
+
 /*
   1. store config params from USER;
   2. NOTICE: store EE before entering LPM;
@@ -64,9 +77,11 @@ typedef struct{
   // pulse width(unit: 0.1ms), so width / 10 = count of ms
   u8 pulse_width;
 
-  // convert to Minutes(unit: minute)
-  u32 pulse_start_time;
-  u32 pulse_end_time;
+  // convert to Minutes(unit: minute)(total 24 bytes)
+  pulse_time_typeDef pulse_timeBuf[PULSE_TIME_BUF_SIZE];
+	// avaliable time num(max is 6, min is 0)
+	// It is no valid if both start time and end time are 0
+  u8 pulse_timeNum;
 } pulse_config_typeDef, *ppulse_config_typeDef;
 
 // rocord dont pulsing data&time period(sotre in EE before LPM)

@@ -50,10 +50,19 @@ typedef enum{
   ble_p_pulse_on,
   // stop pulsing(0x16)
   ble_p_pulse_off,
-  // read pulse config(0x17)
-  ble_p_read_pulseConfig,
-  // write pulse config(0x18)
-  ble_p_write_pulseConfig,
+  /*
+  	config1 only config base param:
+		Data：0F 02 19 0A
+		Note：Pulse_Delay + Pulse_Number + Pulse_Width + Pulse_Rsvi.
+			Pulse_Delay:	0F indicate 15ms.
+			Pulse_Number:	02 indicate 2 pulse.
+			Pulse_Wideth:	19 indicate 2.5ms(25/10).
+			Pulse_Rsvi:		0A indecate 10ms.
+  */
+  // read pulse config1(0x17)
+  ble_p_read_pulseConfig1,
+  // write pulse config1(0x18)
+  ble_p_write_pulseConfig1,
   // request FOTA(0x19)
   ble_p_req_fota,
   // read bpm(0x1A)
@@ -112,6 +121,31 @@ typedef enum{
 
   // RSL10 told mcu: force pulsing ignore R wave and others condition(0x3C)
   ble_p_forcePulsing = 0x3C,
+	/*
+		set and read pulse time(up to 6 groups);
+		First three sets use config2;
+		other three sets use config3;
+		Data：
+			00 00 01 00 04 00 05 00 08 00 09 00
+			12 00 13 00 16 00 17 00 20 00 21 00
+		Note:
+			Pulse_time1 + Pulse_time2 + Pulse_time3.
+			Pulse_time4 + Pulse_time5 + Pulse_time6.
+			Pulse_time: 12 00 13 00 indicate 12:00～13:00.
+	*/
+  // read pulse config2(0x3D)
+  ble_p_read_pulseConfig2,
+  // write pulse config2(0x3E)
+  ble_p_write_pulseConfig2,
+	// read pulse config3(0x3F)
+	ble_p_read_pulseConfig3,
+	// write pulse config3(0x40)
+	ble_p_write_pulseConfig3,
+
+  // read bpm calm max value(0x41)
+  ble_p_read_bpmCalmMax,
+  // write bpm calm max value(0x42)
+  ble_p_write_bpmCalmMax,
 
   // rsl10 told mcu: its status is IDLE, no other command(0x60)
   ble_p_rsl10IsIdle = 0x60,

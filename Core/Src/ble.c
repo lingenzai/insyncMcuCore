@@ -301,6 +301,27 @@ static void ble_startupFpulse(u8 _reqId)
 }
 
 /*
+*/
+static void ble_reqWriteBpmCalmMax(u8 _reqId)
+{
+  bool isOk = true;
+  mcu_bpmCalmMax_typeDef *p = mcu_getBpmCalMax();
+  u8 bpm = ble_spiRxBuf[BLE_P_DATA_INDEX];
+
+  // check bpm value
+
+
+  p->mcu_bpmCalmMax = bpm;
+
+
+  // response RSL10
+  ble_respUserReqOkOrErr(_reqId, isOk);
+
+  // store this key value into EEPROM
+  ee_readOrWriteKeyValue(ee_kv_bpmCalmMax, false);
+}
+
+/*
   brief:
     1. 
 */
@@ -378,7 +399,7 @@ static void ble_reqReadAccelCfg(u8 _reqId)
   brief:
     1. D1-D4: pulse num;
 */
-static void ble_req_readBaseData(u8 _reqId)
+static void ble_reqReadBaseData(u8 _reqId)
 {
   u32 pulsenum  = mcu_getBaseData()->mcu_pulseTotalNum;
   u8 *ptx = ble_spiTxBuf;
@@ -744,22 +765,129 @@ static void ble_reqReadDateTime(u8 _reqId)
 /*
   brief:
     1. read pulse config values from RSl10 through SPI;
-    2. format: HH MM HH MM delay_ms num width, total 7bytes
+    2. 12B_PC Data Format:
+    		Data: 00 00 01 00 04 00 05 00 08 00 09 00
+		    Note:
+      			Pulse_time1 + Pulse_time2 + Pulse_time3
 */
-static void ble_reqWritePulseConfig(u8 _reqId)
+static void ble_reqWritePulseConfig2(u8 _reqId, bool _isConfig3)
+{
+  u8 *prx = ble_spiRxBuf + BLE_P_DATA_INDEX;
+  ppulse_config_typeDef pconfig = pulse_getConfig();
+	int i = 0, count = PULSE_TIME_CONFIG3_INDEX;
+
+  // got pulse config values, store them
+
+	// convert HH:MM formate to minutes
+	if(_isConfig3){
+		// update time[3], time[4], time[5]
+		i = count;
+		count = PULSE_TIME_BUF_SIZE;
+	}
+	for(; i < count; i++){
+		// get hour of start time
+		pconfig->pulse_timeBuf[i].startTime = (*prx++) * 60;
+		// get minute of start time
+		pconfig->pulse_timeBuf[i].startTime += *prx++;
+		// get hour of end time
+		pconfig->pulse_timeBuf[i].endTime = (*prx++) * 60;
+		// get minute of end time
+		pconfig->pulse_timeBuf[i].endTime += *prx++;
+	}
+
+  // response RSL10
+  ble_respUserReqOkOrErr(_reqId, true);
+
+	// is config3 ?
+  if(_isConfig3){
+		// calculate pulse time number
+		for(i = 0; i < PULSE_TIME_BUF_SIZE; i++){
+			if(pconfig->pulse_timeBuf[i].startTime == pconfig->pulse_timeBuf[i].endTime
+				&& pconfig->pulse_timeBuf[i].startTime == PULSE_END_TIME_DEFAULT){
+					break;
+				}
+		}
+		pconfig->pulse_timeNum = i;
+
+		// store this key value into EEPROM
+		ee_readOrWriteKeyValue(ee_kv_pulseConfig, false);
+  }
+}
+
+/*
+  brief:
+    1. send pulse config values to RSl10 through SPI;
+    2. 
+*/
+static void ble_reqReadPulseConfig2(u8 _reqId, bool _isConfig3)
+{
+  u8 *ptx = ble_spiTxBuf;
+  u16 len = sizeof(ble_spiTxBuf);
+  ppulse_config_typeDef pconfig = pulse_getConfig();
+  u32 num = 0;
+	int i = 0, count = PULSE_TIME_CONFIG3_INDEX;
+
+  // clear txbuf
+  memset(ptx, 0, len);
+
+  /* 1. send pulse config values to RSl10 through SPI; */
+  // head
+  *ptx++ = BLE_P_HEAD;
+  // command id
+  *ptx++ = _reqId;
+
+  /*
+    about config2: 12B_PC Data Format
+    Data: 00 00 01 00 04 00 05 00 08 00 09 00
+    Note:
+      Pulse_time1 + Pulse_time2 + Pulse_time3
+
+    About config3: 12B_PC Data Format
+    Data: 12 00 13 00 16 00 17 00 20 00 21 00
+    Note:
+      Pulse_time4 + Pulse_time5 + Pulse_time6
+  */
+  if(_isConfig3){
+		i = count;
+		count = PULSE_TIME_BUF_SIZE;
+  }
+  for(; i < count; i++){
+		// hour of start time
+		*ptx++ = (u8)(pconfig->pulse_timeBuf[i].startTime / 60);
+		// minute of start time
+		*ptx++ = (u8)(pconfig->pulse_timeBuf[i].startTime % 60);
+		// hour of end time
+		*ptx++ = (u8)(pconfig->pulse_timeBuf[i].endTime / 60);
+		// minute of end time
+		*ptx++ = (u8)(pconfig->pulse_timeBuf[i].endTime % 60);
+  }
+  num = ptx - ble_spiTxBuf;
+
+  // check xor
+  ptx = &ble_spiTxBuf[SPI_SEND_NUM - 1];
+  *ptx = 0;
+  for(u32 i = 0; i < num; i++){
+    *ptx ^= ble_spiTxBuf[i];
+  }
+
+  // send the response to RSL10 through SPI in blocked mode
+  BLE_CS_ASSERTED;
+  HAL_SPI_Transmit(&hspi2, ble_spiTxBuf, len, BLE_SPI_TIMEOUT);
+  BLE_CS_DEASSERTED;
+}
+
+/*
+  brief:
+    1. read pulse config values from RSl10 through SPI;
+    2. format: Pulse_Delay + Pulse_Number + Pulse_Width + Pulse_Rsvi, total 4 bytes
+*/
+static void ble_reqWritePulseConfig1(u8 _reqId)
 {
   u8 *prx = ble_spiRxBuf + BLE_P_DATA_INDEX;
   ppulse_config_typeDef pconfig = pulse_getConfig();
 
   // got pulse config values, store them
-  // hours of start time
-  pconfig->pulse_start_time = (*prx++) * 60;
-  // minutes of start time
-  pconfig->pulse_start_time += *prx++;
-  // hours of end time
-  pconfig->pulse_end_time = (*prx++) * 60;
-  // minutes of end time
-  pconfig->pulse_end_time += *prx++;
+
   // Rv delay time
   pconfig->pulse_Rv_delay_ms = *prx++;
   // pulse num
@@ -786,7 +914,7 @@ static void ble_reqWritePulseConfig(u8 _reqId)
     1. send pulse config values to RSl10 through SPI;
     2. 
 */
-static void ble_reqReadPulseConfig(u8 _reqId)
+static void ble_reqReadPulseConfig1(u8 _reqId)
 {
   u8 *ptx = ble_spiTxBuf;
   u16 len = sizeof(ble_spiTxBuf);
@@ -803,20 +931,16 @@ static void ble_reqReadPulseConfig(u8 _reqId)
   *ptx++ = _reqId;
 
   /*
-    7B_PC Data Format:
-    Data: 01 14 03 0A 0F 02 19  
+    4B_PC Data Format:
+    Data: 0F 02 19 0A
     Note: 
-      Pulse_timer+Pulse_Delay+Pulse_Number+Pulse_Wideth.      
-      Pulse_timer:01 14 03 0A indicate 01:20～03:10.
+      Pulse_Delay + Pulse_Number + Pulse_Wideth + Pulse_Rsvi.
       Pulse_Delay:0F indicate 15ms.
       Pulse_Number:02 indicate 2 pulse.
       Pulse_Wideth:19 indicate 2.5ms(25/10).
+			Pulse_Rsvi: 	0A indecate 10ms.
   */
-  *ptx++ = (u8)(pconfig->pulse_start_time / 60);
-  *ptx++ = (u8)(pconfig->pulse_start_time % 60);
-  *ptx++ = (u8)(pconfig->pulse_end_time / 60);
-  *ptx++ = (u8)(pconfig->pulse_end_time % 60);
-  *ptx++ = (u8)(pconfig->pulse_Rv_delay_ms);
+	*ptx++ = (u8)(pconfig->pulse_Rv_delay_ms);
   *ptx++ = (u8)(pconfig->pulse_num);
   *ptx++ = (u8)(pconfig->pulse_width);
   *ptx++ = (u8)(pconfig->pulse_Rsvi_ms);
@@ -834,6 +958,7 @@ static void ble_reqReadPulseConfig(u8 _reqId)
   HAL_SPI_Transmit(&hspi2, ble_spiTxBuf, len, BLE_SPI_TIMEOUT);
   BLE_CS_DEASSERTED;
 }
+
 
 /*
   brief:
@@ -891,14 +1016,31 @@ static void ble_dealReqCommand(void)
       // response user OK
       ble_respUserReqOkOrErr(reqid, true);
       break;
-    // read pulse config(0x17)
-    case ble_p_read_pulseConfig:
-      ble_reqReadPulseConfig(reqid);
+    // read pulse config1(0x17)
+    case ble_p_read_pulseConfig1:
+      ble_reqReadPulseConfig1(reqid);
       break;
-    // write pulse config(0x18)
-    case ble_p_write_pulseConfig:
-      ble_reqWritePulseConfig(reqid);
+    // write pulse config1(0x18)
+    case ble_p_write_pulseConfig1:
+      ble_reqWritePulseConfig1(reqid);
       break;
+  	// read pulse config2(0x3D)
+  	case ble_p_read_pulseConfig2:
+  		ble_reqReadPulseConfig2(reqid, false);
+  		break;
+  	// write pulse config2(0x3E)
+  	case ble_p_write_pulseConfig2:
+  		ble_reqWritePulseConfig2(reqid, false);
+  		break;
+  	// read pulse config3(0x3F)
+  	case ble_p_read_pulseConfig3:
+  		ble_reqReadPulseConfig2(reqid, true);
+  		break;
+  	// write pulse config3(0x40)
+  	case ble_p_write_pulseConfig3:
+  		ble_reqWritePulseConfig2(reqid, true);
+  		break;
+
     // request FOTA(0x19)
     case ble_p_req_fota:
     // rsl10 told mcu: its status is FOTA with APP(0x61)
@@ -1037,7 +1179,7 @@ static void ble_dealReqCommand(void)
       break;
     // RSL10 read base data(0x36)
     case ble_p_read_baseData:
-      ble_req_readBaseData(reqid);
+      ble_reqReadBaseData(reqid);
       break;
 
     // RSL10 read twins channel ecg data(0x37)
@@ -1064,6 +1206,16 @@ static void ble_dealReqCommand(void)
     // RSL10 told mcu: force pulsing ignore R wave and others condition(0x3C)
     case ble_p_forcePulsing:
       ble_startupFpulse(reqid);
+      break;
+
+    // read bpm calm max value(0x41)
+    case ble_p_read_bpmCalmMax:
+      data = mcu_getBpmCalMax()->mcu_bpmCalmMax;
+      ble_respUserReqBase(reqid, &data, sizeof(data));
+      break;
+    // write bpm calm max value(0x42)
+    case ble_p_write_bpmCalmMax:
+      ble_reqWriteBpmCalmMax(reqid);
       break;
 
 

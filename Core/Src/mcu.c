@@ -29,9 +29,11 @@ Data Format:
              06 - Vout float status*/
 static mcu_Voutset_typeDef mcu_Voutset;
 
+
 //static u32 mcu_tick = 0;
 
 static mcu_baseData_typeDef mcu_baseData;
+static mcu_bpmCalmMax_typeDef mcu_bpmCalmMax;
 
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private var define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
@@ -245,7 +247,7 @@ static void mcu_workDriven(void)
 
 /*
   brief:
-    1. store all of important data in EEPROM;
+    1. store all of important data into EEPROM;
     2. 
 */
 static void mcu_storeKeyValue(void)
@@ -300,25 +302,53 @@ static void mcu_setGpioFloatingInput(void)
     3. so we MUST wakeup twice every day;
     4. 
 */
-static void mcu_setLpmWakeupTimer(void)
+static u32 mcu_calWakeupSecond(void)
 {
-  u32 sec;
-  u32 startsec;
-  // seconds of 18 hours
-//  u32 secmax = 18 * 60 * 60;
+	ppulse_config_typeDef p = pulse_getConfig();
+	// init seconds of 18 hours
+	u32 sec = RTC_WKUP_TIMER_COUNT_MAX;
+	// current minute and config minute
+	u32 curm, conm;
+	int i;
 
-  // get current time
-  HAL_RTC_GetTime(&hrtc, &mcu_time, RTC_FORMAT_BIN);
+	// no valid time in pulse config buffer?
+	if(p->pulse_timeNum == 0) return sec;
 
-  // current time convert seconds
-  sec = (mcu_time.Hours * 60 + mcu_time.Minutes) * 60 + mcu_time.Seconds;
-  // get config pulse start time, convert seconds
-  startsec = pulse_getConfig()->pulse_start_time * 60;
+	// get current time
+	HAL_RTC_GetTime(&hrtc, &mcu_time, RTC_FORMAT_BIN);
 
-  // compare these, make sure wakeup time
-  if(sec >= startsec)
-    startsec += MCU_MAX_SECOND_EACH_DAY;
-  sec = startsec - sec;
+	// convert current time to minute(add 1 as weight)
+	curm = mcu_time.Hours * 60 + mcu_time.Minutes + 1;
+
+	// we have only one valid pulse config time?
+	if(p->pulse_timeNum == 1){
+		// get the only one config time(unit: minute)
+		conm = p->pulse_timeBuf[0].startTime;
+	}else{
+		// compare with pulse config start_time
+		for(i = 0; i < p->pulse_timeNum; i++){
+			if(curm < p->pulse_timeBuf[i].startTime){
+				// got it
+				break;
+			}
+		}
+
+		// i is index we want
+		if(i >= p->pulse_timeNum){
+			i = 0;
+		}
+
+		// get config time
+		conm = p->pulse_timeBuf[i].startTime;
+	}
+
+	// compare curm and conm
+	if(curm >= conm){
+		conm += MCU_MAX_MINUTE_EACH_DAY;
+	}
+
+	// get wakeup time (unit: second)
+	sec = conm * 60 - ((mcu_time.Hours * 60 + mcu_time.Minutes) * 60 + mcu_time.Seconds);
 
   // the max counter is 0xFFFF(unit: second) in 16bits wakeup mode, is: 18 hours
   if(sec > RTC_WKUP_TIMER_COUNT_MAX){
@@ -327,8 +357,26 @@ static void mcu_setLpmWakeupTimer(void)
     sec &= 0xFFFF;
   }
 
+	return sec;
+}
+
+/*
+  brief:
+    1. Wakeup timer max count value is 65535, unit is second;
+      it is 18.2 hours;
+    2. pulse wakeup time is 0:30-3:30, 3 hours;
+    3. so we MUST wakeup twice every day;
+    4. 
+*/
+static void mcu_setLpmWakeupTimer(void)
+{
+  u32 sec;
+
+	// calculate wakeup time(unit: second)
+	sec = mcu_calWakeupSecond();
+
 #ifndef LiuJH_DEBUG
-  // set 3s timer; ONLY test
+  // set 8s timer; ONLY test
 //  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, RTC_WAKEUP_TIME_5S, RTC_WAKEUPCLOCK_RTCCLK_DIV16);
   HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 8, RTC_WAKEUPCLOCK_CK_SPRE_16BITS);
 #else
@@ -688,6 +736,23 @@ void mcu_calibrateBaseData(void)
 
 /*
 */
+void mcu_calibrateBpmCalmMax(void)
+{
+  mcu_bpmCalmMax_typeDef *p = &mcu_bpmCalmMax;
+
+  // unvalid? set default
+  if(p->isValid ^ MCU_DATA_STRUCT_VALID_VALUE){
+    p->mcu_bpmCalmMax = PULSING_BPM_CALM_MAX;
+
+    p->isValid = MCU_DATA_STRUCT_VALID_VALUE;
+
+    // store this key value into EEPROM
+    ee_readOrWriteKeyValue(ee_kv_bpmCalmMax, false);
+  }
+}
+
+/*
+*/
 mcu_MotionConfig_typeDef *mcu_getMotionCfg(void)
 {
   return &mcu_motionCfg;
@@ -709,6 +774,13 @@ mcu_Voutset_typeDef *mcu_getVoutset(void)
 mcu_baseData_typeDef *mcu_getBaseData(void)
 {
   return &mcu_baseData;
+}
+
+/*
+*/
+mcu_bpmCalmMax_typeDef *mcu_getBpmCalMax(void)
+{
+  return &mcu_bpmCalmMax;
 }
 
 /*

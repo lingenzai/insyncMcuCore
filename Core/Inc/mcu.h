@@ -149,6 +149,17 @@ typedef struct{
 
 } mcu_baseData_typeDef;
 
+/*
+*/
+typedef struct{
+  u8 isValid;
+
+
+  // heart rate max value of inner peace for pulsing
+  u8 mcu_bpmCalmMax;
+
+} mcu_bpmCalmMax_typeDef;
+
 
 extern SPI_HandleTypeDef hspi2;
 extern ADC_HandleTypeDef hadc;
@@ -174,10 +185,12 @@ extern bool mcu_tryLockSpi(u8 _devID);
 extern mcu_Voutset_typeDef *mcu_getVoutset(void);
 extern mcu_MotionConfig_typeDef *mcu_getMotionCfg(void);
 extern mcu_baseData_typeDef *mcu_getBaseData(void);
+extern mcu_bpmCalmMax_typeDef *mcu_getBpmCalMax(void);
 extern void mcu_setVoutsetPin(u8 _setvalue);
 extern void mcu_calibrateVoutset(void);
 extern void mcu_calibrateMotionPeriod(void);
 extern void mcu_calibrateBaseData(void);
+extern void mcu_calibrateBpmCalmMax(void);
 extern void mcu_TIM6_periodElapsedCB(TIM_HandleTypeDef *htim);
 
 

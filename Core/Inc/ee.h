@@ -48,6 +48,10 @@
 #define ee_addr_baseData_size         (sizeof(mcu_baseData_typeDef))
 #define ee_addr_baseData_end          (ee_addr_baseData + ee_addr_baseData_size - 1)
 
+// bpm calm max in EERPOM
+#define ee_addr_bpmCalmMax            (ee_addr_baseData_end + 1)
+#define ee_addr_bpmCalmMax_size       (sizeof(mcu_bpmCalmMax_typeDef))
+#define ee_addr_bpmCalmMax_end        (ee_addr_bpmCalmMax + ee_addr_bpmCalmMax_size - 1)
 
 
 
@@ -60,6 +64,7 @@ typedef enum{
   ee_kv_VoutSet,
   ee_kv_motionPeriod,
   ee_kv_baseData,
+  ee_kv_bpmCalmMax,
 
 
   ee_kv_max

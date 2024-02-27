@@ -117,6 +117,11 @@ bool ee_restoreKeyValue(void)
   // check valid
   mcu_calibrateBaseData();
 
+  // Param6: bpm calm max threshold
+  ee_readOrWriteKeyValue(ee_kv_bpmCalmMax, true);
+  // check valid
+  mcu_calibrateBpmCalmMax();
+
   return ret;
 }
 
@@ -183,6 +188,12 @@ bool ee_readOrWriteKeyValue(ee_keyvalue_typeDef _key, bool _isRead)
       addr = ee_addr_baseData;
       pdata = (u8 *)(mcu_getBaseData());
       len = ee_addr_baseData_size;
+      break;
+    case ee_kv_bpmCalmMax:
+      // Param6: bpm calm max value
+      addr = ee_addr_bpmCalmMax;
+      pdata = (u8 *)(mcu_getBpmCalMax());
+      len = ee_addr_bpmCalmMax_size;
       break;
 
 
