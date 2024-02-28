@@ -249,6 +249,10 @@ static void pulse_smWaitingProc(void)
   if(fpulse_isWorking())
     goto pulse_smWaitingProcEnd;
 
+  // is charging? dont pulsing
+  if(wpr_isCharging())
+    goto pulse_smWaitingProcEnd;
+
   // if ble is working, ble_pulsing switch is OFF?
   if(ble_isWorking() && !pulse_blePulsingOn)
     goto pulse_smWaitingProcEnd;

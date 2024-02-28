@@ -70,7 +70,7 @@
 #define MCU_SPI_FLASH           mcu_spi_flashSending_status
 
 // accel redo period default value(15S)
-#define MCU_MOTION_PERIOD_DEFAULT     15
+#define MCU_MOTION_PERIOD_DEFAULT     6 // 15 // 
 // accel motion and motionless threshold default value
 #define MCU_MOTION_THRESHOLD_DEFAULT  300
 

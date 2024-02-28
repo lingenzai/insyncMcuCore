@@ -70,7 +70,7 @@ static u32 ecg_adcTrimPeakTick;
 // and then it is flag of the first data tick in buffer
 static u32 ecg_adcStableTick;
 // record redo because too little bpm
-static bool ecg_detectAgain;
+static bool ecg_detectAgain = false;
 
 
 /* private fuction define *****************************************/
@@ -232,7 +232,6 @@ static void ecg_init2(void)
   ecg_RnEscaped = 0;
   ecg_RnEscapedAll = 0;
 
-  ecg_detectAgain = false;
 }
 
 /*
@@ -596,6 +595,7 @@ static void ecg_smRnDetect(void)
             ecg_status = ecg_startup_status;
             return;
           }else{
+            // update bpm and others params and loop Rn detection
             ecg_RRiPointNum[chIndex] = offb;
             ecg_RRiTimeMs[chIndex] = ms;
             // update this bpm
@@ -640,7 +640,7 @@ static void ecg_smRnDetect(void)
 		ecg_RnEscaped++;
 		ecg_RnEscapedAll++;
 
-#ifndef LiuJH_DEBUG
+#ifdef LiuJH_DEBUG
 		// twice continue escaped? restart R1 waiting...
 		if(ecg_RnEscaped >= ECG_ESCAPED_MAX_NUM){
 		  // redo R detect, restart up ecg detection
@@ -804,6 +804,7 @@ static void ecg_smRnWaiting(void)
     if(ecg_RRiTimeMs[chIndex])
       ecg_bpm[chIndex] = (60 * 1000) / ecg_RRiTimeMs[chIndex];
 
+#ifndef LiuJH_DEBUG
     // need redo because of more little bpm value?
     if(!ecg_detectAgain && ecg_bpm[chIndex] < ECG_BPM_MIN){
       ecg_detectAgain = true;
@@ -812,6 +813,11 @@ static void ecg_smRnWaiting(void)
       // update finished flag
       ecg_Rok[chIndex] = true;
     }
+#else
+    // update finished flag
+    ecg_Rok[chIndex] = true;
+#endif
+
   }
 }
 

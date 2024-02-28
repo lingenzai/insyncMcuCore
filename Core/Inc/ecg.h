@@ -58,7 +58,7 @@
 // use 0.85 as R value weight
 #define ECG_R_VALUE_WEIGHT          9 / 10  // 17 / 20  /* 29/32 */	// 	
 // Rn half of move window size
-#define ECG_Rn_MW_HALF_SIZE         5 // 3 // 2  // 4 // 
+#define ECG_Rn_MW_HALF_SIZE         6 // 5 // 3 // 2  // 4 // 
 // Rn detect data num
 #define ECG_RN_DETECT_NUM           3
 // 4 + 1 + 4, guess Rn peak point is in middle of these points
@@ -77,7 +77,7 @@
 // weight of bpm change value
 #define ECG_BPM_WEIGHT              10
 
-#define ECG_BPM_MIN                 50
+#define ECG_BPM_MIN                 65  // 50 // 
 
 
 
