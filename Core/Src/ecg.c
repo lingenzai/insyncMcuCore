@@ -343,7 +343,7 @@ static void ecg_cbStoreWordToBuf(u8 _chIndex, i32 _iValue)
   // update buf offset if all u16 data have been processed 
   if(ecg_bufBnum[_chIndex] == ecg_bufWnum[_chIndex]){
     ecg_bufWoff[_chIndex] = ecg_bufBnum[_chIndex];
-	ecg_bufBoff[_chIndex] = ecg_bufWoff[_chIndex];
+	  ecg_bufBoff[_chIndex] = ecg_bufWoff[_chIndex];
   }
 
   // if we have no enough space for storing data, return
@@ -362,14 +362,14 @@ static void ecg_cbStoreWordToBuf(u8 _chIndex, i32 _iValue)
 
 /*
   brief:
-    1. weight = 60000 * (1/(bpm - 5) - 1/(bpm + 5)) / 2;
-    2. So is: weight = 300000 / ((bpm - 5)(bpm + 5));unit is: ms
+    1. weight = 60000 * (1/(bpm - ECG_BPM_WEIGHT) - 1/(bpm + ECG_BPM_WEIGHT)) / 2;
+    2. So is: weight = 300000 / ((bpm - ECG_BPM_WEIGHT)(bpm + ECG_BPM_WEIGHT));unit is: ms
     3. We want points, So weight = (weight + 2) >> 2;
-    4. So is: weight = (300000 / ((bpm - 5)(bpm + 5)) + 2) >> 2;
+    4. So is: weight = (300000 / ((bpm - ECG_BPM_WEIGHT)(bpm + ECG_BPM_WEIGHT)) + 2) >> 2;
     5. 60000 is 1minute-->number of ms;
-    6. the MIN move window is 10 points;
+    6. the MIN move window is (ECG_Rn_MW_HALF_SIZE * 2 - 1) points, so half window is ECG_Rn_MW_HALF_SIZE;
 */
-static u32 ecg_calRnWinWeight(void)
+static u32 ecg_calRnWinHalfWeight(void)
 {
   u32 ret = ECG_Rn_MW_HALF_SIZE;
   u32 m = 300000;
@@ -378,10 +378,17 @@ static u32 ecg_calRnWinWeight(void)
   // check bpm and b is valid
   if(!ecg_bpm[ECG_RS_INDEX] || b == 0) return ret;
 
-  // calculate move window value
-//  b = (m / b + 2) >> 2;
-  b = (m / b + 2) >> 2;
+#ifndef LiuJH_DEBUG
+  // test only(test it later, we'll use this calculate methlod)
 
+  // calculate time of half weight(unit: ms)
+  b = m / b;
+  // calculate point num of move window
+  b = (b * 1000 + (ecg_RPPiTimeUs >> 1)) / ecg_RPPiTimeUs;
+#else
+  // calculate move window value
+  b = (m / b + 2) >> 2;
+#endif
   // use it?
   if(b > ret)
     ret = b;
@@ -411,7 +418,7 @@ static void ecg_smRnDetected(void)
 	*/
 
   // update Rn weight using the newest bpm
-  ecg_RnHalfWeight = ecg_calRnWinWeight();
+  ecg_RnHalfWeight = ecg_calRnWinHalfWeight();
 
 	// is escape?
 	if(ecg_RnEscaped){
@@ -676,7 +683,7 @@ static void ecg_smRnWaiting2(void)
       3. we only detect Rs-RDET;
   */
 
-  ecg_RnHalfWeight = ecg_calRnWinWeight();  // ECG_Rn_MW_HALF_SIZE; // 
+  ecg_RnHalfWeight = ecg_calRnWinHalfWeight();  // ECG_Rn_MW_HALF_SIZE; // 
 
   // get Rn window min and max point num
   ecg_RnWmin = ecg_RRiPointNum[chIndex] - ecg_RnHalfWeight; // ECG_Rn_MW_HALF_SIZE; // 
@@ -835,7 +842,7 @@ static void ecg_smRnWaiting(void)
 static void ecg_smR2Detect(void)
 {
   u8 chIndex = ECG_RS_INDEX;
-  u16 adcValue;
+  u16 adcValue = 0;
   u8 *p, *pn;
   int i;
   int32_t slope;
@@ -939,7 +946,7 @@ static void ecg_smR2Detect(void)
 static void ecg_smR1Detect(void)
 {
   u8 chIndex = ECG_RS_INDEX;
-  u16 adcValue;
+  u16 adcValue = 0;
 
   // pull u16 adc value from Rs and Rv buf and convert to byte and store into buf again
   if(ecg_pollAdcValue(&chIndex, &adcValue)){
@@ -1002,8 +1009,8 @@ static void ecg_cbSmR1Waiting(u8 _chIndex, i32 _adcValue)
 static void ecg_smR1Waiting(void)
 {
   u8 chIndex = ECG_RS_INDEX;
-  u16 adcValue;
-  u8 byte;
+  u16 adcValue = 0;
+  u8 byte = 0;
 
   // Both of Rs and Rv channel finished? go into next status
   if(ecg_Rok[ECG_RS_INDEX] && ecg_Rok[ECG_RV_INDEX]){
@@ -1038,26 +1045,26 @@ static void ecg_smR1Waiting(void)
 
   // check and record max value(for R1 peak point) after some data(for slope)
   // we want max value at last
-  if(byte >= ecg_Rvalue[chIndex]){
+  if(byte && byte >= ecg_Rvalue[chIndex]){
     // record data value
     ecg_Rvalue[chIndex] = byte;
     // record data offset in buf
     ecg_R1off[chIndex] = ecg_bufBnum[chIndex] - 1;
   }
 
-  // exceed buffer?
-  if(ecg_bufBnum[chIndex] > ECG_BUF_R1_NEED_NUM
-     // check the wave is stable or not(Continuous of max value)
-     && ecg_Rvalue[chIndex] == ECG_MAX_BYTE_VALUE
-     && ecg_buf[chIndex][ecg_bufBnum[chIndex] - 1] == ECG_MAX_BYTE_VALUE){
 
-    // restart collect data
-    ecg_status = ecg_startup_status;
-  }else{
-    // collect data finished? update finished flag in current channel
-    if(ecg_bufBnum[chIndex] >= ECG_BUF_R1_NEED_NUM
+  // collect data finished? update finished flag in current channel
+  // check overflow or OK
+  if(ecg_bufBnum[chIndex] >= ECG_BUF_R1_NEED_NUM){
+    // exceed buffer?
+    // check the wave is stable or not(Continuous of max value)
+    if((ecg_Rvalue[chIndex] == ecg_buf[chIndex][ecg_R1off[chIndex] - 1])
       // for slope data num
-      && ecg_bufBnum[chIndex] > ecg_R1off[chIndex] + ECG_R2_MW_SIZE){
+      || (ecg_bufBnum[chIndex] <= ecg_R1off[chIndex] + ECG_R2_MW_SIZE)){
+      
+      // restart collect data
+      ecg_status = ecg_startup_status;
+    }else{
       // update finished flag
       ecg_Rok[chIndex] = true;
     }
