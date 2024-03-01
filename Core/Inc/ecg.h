@@ -181,6 +181,7 @@ extern void ecg_init(void);
 extern void ecg_stateMachine(void);
 extern void ecg_startup(void);
 extern void ecg_adcConvCpltCB(u8 _curCh);
+extern void ecg_getAdcPeakValue(u16 *_pmax, u16 *_pmin);
 extern u8 ecg_getBpm(void);
 extern u32 ecg_getRnTick(void);
 extern bool ecg_getRsviAbout(u8 *_pdata);

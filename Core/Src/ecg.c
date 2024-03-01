@@ -282,13 +282,13 @@ static void ecg_filterPeakValue(u16 _adcValue)
 
   // update max and min data
   if(value > ecg_adcMaxValue)
-    ecg_adcMaxValue = value;
+    ecg_adcMaxValue = value;  // + (value >> 5);
   if(value < ecg_adcMinValue)
     ecg_adcMinValue = value;
-  
+
   // record peak value interval 2.5s
   if(value > ecg_adcPeakMaxValue)
-    ecg_adcPeakMaxValue = value;
+    ecg_adcPeakMaxValue = value;  // + (value >> 5);
   if(value < ecg_adcPeakMinValue)
     ecg_adcPeakMinValue = value;
 }
@@ -520,6 +520,11 @@ static void ecg_smRnDetect(void)
   	adcValue = ps[ecg_bufBoff[chIndex]++];
   	// pull LSB of u16
   	adcValue = (adcValue << 8) | ps[ecg_bufBoff[chIndex]++];
+
+#ifdef LiuJH_DEBUG
+    // trim peak point value??
+    ecg_filterPeakValue(adcValue);
+#endif
 
   	// convert u16 to u8 and store into Rs buf
   	ecg_convAdcValueToByte(chIndex, adcValue, true);
@@ -1253,6 +1258,15 @@ void ecg_adcConvCpltCB(u8 _curCh)
 
   // start ecg real-time state machine process
   ecg_cbStateMachine(_curCh >> 2, adcValue);
+}
+
+
+/*
+*/
+void ecg_getAdcPeakValue(u16 *_pmax, u16 *_pmin)
+{
+  *_pmax = (u16)ecg_adcMaxValue;
+  *_pmin = (u16)ecg_adcMinValue;
 }
 
 /*

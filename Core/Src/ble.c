@@ -402,6 +402,7 @@ static void ble_reqReadAccelCfg(u8 _reqId)
 static void ble_reqReadBaseData(u8 _reqId)
 {
   u32 pulsenum  = mcu_getBaseData()->mcu_pulseTotalNum;
+  u16 adcMaxValue, adcMinValue;
   u8 *ptx = ble_spiTxBuf;
   u16 len = sizeof(ble_spiTxBuf);
   u32 num = 0;
@@ -409,17 +410,27 @@ static void ble_reqReadBaseData(u8 _reqId)
   // clear txbuf
   memset(ptx, 0, len);
 
+  // get adc max and min value
+  ecg_getAdcPeakValue(&adcMaxValue, &adcMinValue);
+
   /* 1. send pulse num to RSl10 through SPI; */
   // head
   *ptx++ = BLE_P_HEAD;
   // command id
   *ptx++ = _reqId;
 
-  // pad value
+  // pad value1: pulse total num
   *ptx++ = (u8)(pulsenum >> 24);
   *ptx++ = (u8)(pulsenum >> 16);
   *ptx++ = (u8)(pulsenum >> 8);
-  *ptx++ = pulsenum;
+  *ptx++ = (u8)pulsenum;
+
+  // pad value2: adc max value
+  *ptx++ = (u8)(adcMaxValue >> 8);
+  *ptx++ = (u8)(adcMaxValue);
+  // pad value3: adc min value
+  *ptx++ = (u8)(adcMinValue >> 8);
+  *ptx++ = (u8)(adcMinValue);
 
   // length
   num = ptx - ble_spiTxBuf;
