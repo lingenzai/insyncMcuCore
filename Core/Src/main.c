@@ -523,7 +523,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, PIN30_PA9_WLC38_ON_Pin|CCM_PIN38_BLE_CS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, CCM_PIN32_VPOS_EN_Pin|CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, CCM_PIN31_PULSE_SWITCH_Pin|CCM_PIN32_VPOS_EN_Pin|CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(CCM_PIN46_VPON_GPIO_Port, CCM_PIN46_VPON_Pin, GPIO_PIN_RESET);
@@ -554,6 +554,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(PIN30_PA9_WLC38_ON_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : CCM_PIN31_PULSE_SWITCH_Pin */
+  GPIO_InitStruct.Pin = CCM_PIN31_PULSE_SWITCH_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(CCM_PIN31_PULSE_SWITCH_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : CCM_PIN32_VPOS_EN_Pin CCM_PIN33_VNEG_EN_Pin */
   GPIO_InitStruct.Pin = CCM_PIN32_VPOS_EN_Pin|CCM_PIN33_VNEG_EN_Pin;

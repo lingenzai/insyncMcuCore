@@ -1260,6 +1260,12 @@ void ecg_adcConvCpltCB(u8 _curCh)
   ecg_cbStateMachine(_curCh >> 2, adcValue);
 }
 
+/*
+*/
+u8 ecg_getStatus(void)
+{
+  return (u8)(ecg_status);
+}
 
 /*
 */

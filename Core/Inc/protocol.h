@@ -147,6 +147,9 @@ typedef enum{
   // write bpm calm max value(0x42)
   ble_p_write_bpmCalmMax,
 
+  // read some bytes for debug(0x43)
+  ble_p_read_debugLog,
+
   // rsl10 told mcu: its status is IDLE, no other command(0x60)
   ble_p_rsl10IsIdle = 0x60,
   // rsl10 told mcu: its status is FOTA with APP(0x61)

@@ -289,6 +289,95 @@ static void ble_respUserReqBase(u8 _cmd, u8 *_pdata, u32 _datalen)
 
 
 /*
+  brief:
+    1. pad bytes into buffer pointed by *_pp;
+    2. *_pp MUST ++;
+    3. we can pad 13 debug bytes each time;
+*/
+static void ble_padDebugValue(u8 **_pptx)
+{
+#ifdef LiuJH_DEBUG
+  u8 *ptx = *_pptx;
+  u32 tick = HAL_GetTick();
+
+  // pad byte1: current bpm
+  *ptx++ = (u8)(ecg_getBpm());
+
+  // pad byte2: current ecg status
+  *ptx++ = (u8)(ecg_getStatus());
+
+  // pad byte3: Data3 of current tick
+  *ptx++ = (u8)(tick >> 24);
+  // pad byte4: Data2 of current tick
+  *ptx++ = (u8)((tick >> 16) & 0xFF);
+  // pad byte5: Data1 of current tick
+  *ptx++ = (u8)((tick >> 8) & 0xFF);
+  // pad byte6: Data0 of current tick
+  *ptx++ = (u8)(tick & 0xFF);
+
+#ifndef LiuJH_DEBUG
+  // pad byte7: 
+  *ptx++ = (u8)();
+  // pad byte8: 
+  *ptx++ = (u8)();
+  // pad byte9: 
+  *ptx++ = (u8)();
+  // pad byte10: 
+  *ptx++ = (u8)();
+  // pad byte11: 
+  *ptx++ = (u8)();
+  // pad byte12: 
+  *ptx++ = (u8)();
+  // pad byte13: 
+  *ptx++ = (u8)();
+#endif
+#endif
+}
+
+/*
+  brief:
+    1. Only for test and debug my code;
+    2. Output some bytes I will watch per 150ms;
+    3. Output max 13 bytes every time;
+    4. Note these code when I dont need it;
+    5. 
+*/
+static void ble_reqReadDebugBytes(u8 _reqId)
+{
+  u8 *ptx = ble_spiTxBuf;
+  u16 len = sizeof(ble_spiTxBuf);
+  u32 num = 0;
+
+  // clear txbuf
+  memset(ptx, 0, len);
+
+  /* 1. send Date Time to RSl10 through SPI; */
+  // head
+  *ptx++ = BLE_P_HEAD;
+  // command id
+  *ptx++ = _reqId;
+
+  // pad debug bytes value
+  ble_padDebugValue(&ptx);
+
+  // length
+  num = ptx - ble_spiTxBuf;
+
+  // check xor
+  ptx = ble_spiTxBuf + SPI_SEND_NUM - 1;
+  *ptx = 0;
+  for(u32 i = 0; i < num; i++){
+    *ptx ^= ble_spiTxBuf[i];
+  }
+
+  // send the response to RSL10 through SPI in blocked mode
+  BLE_CS_ASSERTED;
+  HAL_SPI_Transmit(&hspi2, ble_spiTxBuf, len, BLE_SPI_TIMEOUT);
+  BLE_CS_DEASSERTED;
+}
+
+
+/*
 */
 static void ble_startupFpulse(u8 _reqId)
 {
@@ -1229,6 +1318,11 @@ static void ble_dealReqCommand(void)
       ble_reqWriteBpmCalmMax(reqid);
       break;
 
+
+    // read some bytes for debug(0x43)
+    case ble_p_read_debugLog:
+      ble_reqReadDebugBytes(reqid);
+      break;
 
 
 /*

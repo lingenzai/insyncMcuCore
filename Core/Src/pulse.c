@@ -36,6 +36,9 @@ static bool pulse_blePulsingOn;
 // record pulse config time index of group
 static int pulse_conTimeIndex;
 
+// Rv-Sense switch period(unit: ms)
+static u32 pulse_RvSenseSwitchTick;
+
 
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private var define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
@@ -205,6 +208,24 @@ static bool pulse_workTimeIsOver(void)
 
 /*
   brief:
+    1. 
+*/
+static void pulse_RvSenseSwitch(bool _isSet)
+{
+  if(!_isSet){
+    if(HAL_GPIO_ReadPin(CCM_PIN31_PULSE_SWITCH_GPIO_Port, CCM_PIN31_PULSE_SWITCH_Pin) == GPIO_PIN_SET
+      && HAL_GetTick() > pulse_RvSenseSwitchTick){
+      // reset Rv-Sense switch off pin
+      HAL_GPIO_WritePin(CCM_PIN31_PULSE_SWITCH_GPIO_Port, CCM_PIN31_PULSE_SWITCH_Pin, GPIO_PIN_RESET);
+    }
+  }else{
+    // set Rv-Sense switch on pin
+    HAL_GPIO_WritePin(CCM_PIN31_PULSE_SWITCH_GPIO_Port, CCM_PIN31_PULSE_SWITCH_Pin, GPIO_PIN_SET);
+  }
+}
+
+/*
+  brief:
     1. creating pulsing state machine;
     2. finish pulsing, update to waiting status;
     3. waiting pulsing is OK, then return next status for next pulsing;
@@ -215,6 +236,9 @@ static void pulse_smPusingProc(void)
   if(ovbc_isWorking()) return;
 
   /* ovbc is finished pulsing work */
+
+  // after sometimes(30ms or 40ms?) we will switch on Rv-Sense channel
+  pulse_RvSenseSwitchTick = HAL_GetTick() + PULSE_RV_SENSE_SWITCH_PERIOD;
 
   // for next pulsing
   pulse_status = pulse_waiting_status;
@@ -245,6 +269,8 @@ static void pulse_smWaitingProc(void)
   }
 
   /* NOW: we can check pulsing switch and flag */
+
+  pulse_RvSenseSwitch(false);
 
   if(fpulse_isWorking())
     goto pulse_smWaitingProcEnd;
@@ -277,6 +303,9 @@ static void pulse_smWaitingProc(void)
   if(pulse_ecgPulsingOn){
     // start up pulsing
     ovbc_startup();
+
+    // switch off Rv-Sense into Rv and Rs adc sample
+    pulse_RvSenseSwitch(true);
 
     // record pulse total num
     mcu_getBaseData()->mcu_pulseTotalNum++;
@@ -551,6 +580,7 @@ void pulse_init(void)
   pulse_ecgPulsingOn = false;
   pulse_blePulsingOn = false;
 	pulse_conTimeIndex = 0;
+  pulse_RvSenseSwitchTick = HAL_GetTick();
 
   ovbc_init();
 

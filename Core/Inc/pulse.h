@@ -51,6 +51,10 @@
 #define PULSE_TIME_BUF_SIZE							6
 #define PULSE_TIME_CONFIG3_INDEX					3
 
+// record Rv-Sense switch time(unit: ms) after pulse end
+// so Rsvi + RvDelay
+#define PULSE_RV_SENSE_SWITCH_PERIOD      230
+
 
 /*
 */

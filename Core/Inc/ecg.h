@@ -55,8 +55,12 @@
 #define ECG_SLOPE_NUM               4
 // use 0.80 as slope weight
 #define ECG_SLOPE_WEIGHT            4 / 5
-// use 0.85 as R value weight
-#define ECG_R_VALUE_WEIGHT          9 / 10  // 17 / 20  /* 29/32 */	// 	
+
+// use 0.7 as R1-->R2 value weight
+#define ECG_R_VALUE_WEIGHT1         7 / 10
+// use 0.9 as Rn value weight
+#define ECG_R_VALUE_WEIGHT          9 / 10
+
 // Rn half of move window size
 #define ECG_Rn_MW_HALF_SIZE         6 // 5 // 3 // 2  // 4 // 
 // Rn detect data num
@@ -95,7 +99,7 @@ typedef enum{
     2. check wakeup reason, if magnet hall go into idle status;
     3. if RTC timer wakeup, goto startup status;
   */
-  ecg_inited_status,
+  ecg_inited_status = 0,
   /*
     1. do noting;
     2. no working;
@@ -121,7 +125,7 @@ typedef enum{
     2. until 2.5 s, make sure include one R peak point;
     3. so go into R1detect status;
   */
-  ecg_R1waiting_status,
+  ecg_R1waiting_status,     // 5
   /*
     1. start flag: magnet wakeup mcu or adc sample start;
     2. job brief: 
@@ -129,7 +133,7 @@ typedef enum{
       calculate V(average value of the slope);
     3. stop flag: get R1 and V;
   */
-  ecg_R1Detect_status,
+  ecg_R1Detect_status,      // 6
   /*
     1. start flag: get R1 and V;
     2. job brief:
@@ -137,19 +141,19 @@ typedef enum{
       calculate RRi value;
     3. stop flag: get R2 and RRi value;
   */
-  ecg_R2Detect_status,
+  ecg_R2Detect_status,      // 7
   /*
     1. start flag: get R2 peak point;
     2. job brief:
       update all vars about buf in adc callback;
   */
-  ecg_Rnwaiting_status,
+  ecg_Rnwaiting_status,     // 8
   /*
     1. RRi and slopeV got it;
     2. waiting MCU working;
     3. if MCU start working, goto next status;
   */
-  ecg_Rnwaiting2_status,
+  ecg_Rnwaiting2_status,    // 9
   /*
     1. start flag: get R2 and RRi value;
     2. job brief:
@@ -157,12 +161,12 @@ typedef enum{
       ...
     3. stop flag: ADC sample stop;
   */
-  ecg_RnDetect_status,
+  ecg_RnDetect_status,      // 10
 
   /*
     1. 
   */
-  ecg_RnDetected_status,
+  ecg_RnDetected_status,    // 11
 
 
   pulse_Max_status
@@ -181,6 +185,7 @@ extern void ecg_init(void);
 extern void ecg_stateMachine(void);
 extern void ecg_startup(void);
 extern void ecg_adcConvCpltCB(u8 _curCh);
+extern u8 ecg_getStatus(void);
 extern void ecg_getAdcPeakValue(u16 *_pmax, u16 *_pmin);
 extern u8 ecg_getBpm(void);
 extern u32 ecg_getRnTick(void);
