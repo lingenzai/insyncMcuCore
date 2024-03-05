@@ -1365,8 +1365,13 @@ static bool ble_commandNeedDeal(void)
   if(*prx != BLE_P_HEAD) goto error;
 
   // command code is idle or connected(ble_p_rsl10IsIdle, ble_p_rsl10IsConnected)?
-  if(prx[BLE_P_COMMAND_INDEX] == ble_p_rsl10IsIdle)
+  if(prx[BLE_P_COMMAND_INDEX] == ble_p_rsl10IsIdle){
+    if(pulse_blePulsingIsOn()){
+      // pulse switch off in idle mode
+      pulse_bleConfigPulseOn(false);
+    }
     goto error;
+  }
 
   // check sum is correct
   for(u32 i = 0; i < len; i++){
