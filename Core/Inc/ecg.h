@@ -83,7 +83,16 @@
 
 #define ECG_BPM_MIN                 65  // 50 // 
 
+// Avoid having two maximum values at the same time
+#define ECG_ADC_MAX_VALUE_GAIN    50
+// ADC value weight of no signal
+#define ECG_ADC_NO_SIGNAL_WEIGHT    50
 
+
+#ifndef LiuJH_DEBUG
+// test of using Rs-RDET and Rv-RDET data of Animal Test 1
+#define LiuJH_ECG
+#endif
 
 
 /* type define ****************************************************/
@@ -104,22 +113,22 @@ typedef enum{
     1. do noting;
     2. no working;
   */
-  ecg_idle_status,
+  ecg_idle_status,          // 1
   /*
     1. startup adc;
     2. go into next status;
   */
-  ecg_startup_status,
+  ecg_startup_status,       // 2
   /*
     1. only store u16 data into buf, and sample peak point;
     2. dont convert to u8 data;
   */
-  ecg_stableWaiting_status,
+  ecg_stableWaiting_status, // 3
   /*
     1. only synchronous Loop stateMachine and ADC callback;
     2. update all vars of buf in Loop stateMachine, and AdcCB do nothing;
   */
-  ecg_sync1_status,
+  ecg_sync1_status,         // 4
   /*
     1. adc sample start, and record adc data;
     2. until 2.5 s, make sure include one R peak point;
@@ -172,6 +181,18 @@ typedef enum{
   pulse_Max_status
 } ecg_Status_typeDef;
 
+/*
+*/
+typedef struct{
+  u8 isValid;
+
+
+  // ADC value weight of no signal
+  u8 ecg_AdcNoSignalWeight;
+  // Avoid having two maximum values at the same time
+  u8 ecg_AdcMaxValueGain;
+} ecg_AdcWeightGain_typeDef;
+
 
 
 /* extern variable *************************************************/
@@ -185,6 +206,8 @@ extern void ecg_init(void);
 extern void ecg_stateMachine(void);
 extern void ecg_startup(void);
 extern void ecg_adcConvCpltCB(u8 _curCh);
+extern void ecg_calibrateAdcWeightGain(void);
+extern ecg_AdcWeightGain_typeDef* ecg_getAdcWeightGain(void);
 extern u8 ecg_getStatus(void);
 extern void ecg_getAdcPeakValue(u16 *_pmax, u16 *_pmin);
 extern u8 ecg_getBpm(void);

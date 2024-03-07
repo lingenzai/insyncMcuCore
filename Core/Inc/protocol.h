@@ -150,6 +150,11 @@ typedef enum{
   // read some bytes for debug(0x43)
   ble_p_read_debugLog,
 
+  // read ADC no signal weight value and max value gain(0x44)
+  ble_p_read_AdcWeightGain,
+  // write ADC no signal weight value and max value gain(0x45)
+  ble_p_write_AdcWeightGain,
+
   // rsl10 told mcu: its status is IDLE, no other command(0x60)
   ble_p_rsl10IsIdle = 0x60,
   // rsl10 told mcu: its status is FOTA with APP(0x61)

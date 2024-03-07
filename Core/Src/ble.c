@@ -24,7 +24,11 @@ static u32 ble_spiSentnum;
 
 // buffer to adc sample datas transfered to RSL10 through SPI.
 //static u8 adc_data_buf[2 * BUFFER_SIZE_1KB] = {0};
+#ifdef LiuJH_ECG
+static u8 adc_data_buf[BUFFER_SIZE_256B] = {0};
+#else
 static u8 adc_data_buf[BUFFER_SIZE_512B] = {0};
+#endif
 static size_t adc_data_buf_size = sizeof(adc_data_buf);
 static u8 *padc_data_start = &adc_data_buf[0];
 static u8 *padc_data_end = &adc_data_buf[0];
@@ -332,6 +336,68 @@ static void ble_padDebugValue(u8 **_pptx)
   *ptx++ = (u8)();
 #endif
 #endif
+}
+
+
+/*
+  brief:
+    1. 
+*/
+static void ble_reqWriteAdcWeightGain(u8 _reqId)
+{
+  u8 *prx = ble_spiRxBuf + BLE_P_DATA_INDEX;
+  ecg_AdcWeightGain_typeDef *pa = ecg_getAdcWeightGain();
+
+  /* got values, store them */
+
+  pa->ecg_AdcNoSignalWeight = *prx++;
+  pa->ecg_AdcMaxValueGain = *prx;
+
+  // response RSL10
+  ble_respUserReqOkOrErr(_reqId, true);
+
+  // store this key value into EEPROM
+  ee_readOrWriteKeyValue(ee_kv_AdcWeightGain, false);
+}
+
+/*
+  brief:
+    1. 
+*/
+static void ble_reqReadAdcWeightGain(u8 _reqId)
+{
+  ecg_AdcWeightGain_typeDef *pa = ecg_getAdcWeightGain();
+  u8 *ptx = ble_spiTxBuf;
+  u16 len = sizeof(ble_spiTxBuf);
+  u32 num = 0;
+
+  // clear txbuf
+  memset(ptx, 0, len);
+
+  /* 1. send to RSl10 through SPI; */
+  // head
+  *ptx++ = BLE_P_HEAD;
+  // command id
+  *ptx++ = _reqId;
+
+  // pad value
+  *ptx++ = pa->ecg_AdcNoSignalWeight;
+  *ptx++ = pa->ecg_AdcMaxValueGain;
+
+  // length
+  num = ptx - ble_spiTxBuf;
+
+  // check xor
+  ptx = ble_spiTxBuf + SPI_SEND_NUM - 1;
+  *ptx = 0;
+  for(u32 i = 0; i < num; i++){
+    *ptx ^= ble_spiTxBuf[i];
+  }
+
+  // send the response to RSL10 through SPI in blocked mode
+  BLE_CS_ASSERTED;
+  HAL_SPI_Transmit(&hspi2, ble_spiTxBuf, len, BLE_SPI_TIMEOUT);
+  BLE_CS_DEASSERTED;
 }
 
 /*
@@ -1322,6 +1388,15 @@ static void ble_dealReqCommand(void)
     // read some bytes for debug(0x43)
     case ble_p_read_debugLog:
       ble_reqReadDebugBytes(reqid);
+      break;
+
+    // read ADC no signal weight value and max value gain(0x44)
+    case ble_p_read_AdcWeightGain:
+      ble_reqReadAdcWeightGain(reqid);
+      break;
+    // write ADC no signal weight value and max value gain(0x45)
+    case ble_p_write_AdcWeightGain:
+      ble_reqWriteAdcWeightGain(reqid);
       break;
 
 

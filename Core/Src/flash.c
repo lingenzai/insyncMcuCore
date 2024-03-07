@@ -37,7 +37,11 @@ static u8 flash_RsInfoIndex;
 static u8 flash_RvInfoIndex;
 
 // buffer to adc sample datas transfered to flash through SPI.
+#ifdef LiuJH_ECG
+static u8 flash_RsAdcDataBuf[100];
+#else
 static u8 flash_RsAdcDataBuf[BUFFER_SIZE_512B];
+#endif
 //static u32 flash_RsBufSize = sizeof(flash_RsAdcDataBuf);
 static u8 *flash_pRsBufStart = flash_RsAdcDataBuf;
 static u8 *flash_pRsBufEnd = flash_RsAdcDataBuf;
@@ -46,7 +50,11 @@ static bool flash_RsWriteLocking;
 // record current time write data num into flash
 static u16 flash_RsWrittenNum;
 
+#ifdef LiuJH_ECG
+static u8 flash_RvAdcDataBuf[100];
+#else
 static u8 flash_RvAdcDataBuf[BUFFER_SIZE_512B];
+#endif
 //static u32 flash_RvBufSize = sizeof(flash_RvAdcDataBuf);
 static u8 *flash_pRvBufStart = flash_RvAdcDataBuf;
 static u8 *flash_pRvBufEnd = flash_RvAdcDataBuf;

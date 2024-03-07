@@ -122,6 +122,11 @@ bool ee_restoreKeyValue(void)
   // check valid
   mcu_calibrateBpmCalmMax();
 
+  // Param7: ADC no signal weight value and max value gain
+  ee_readOrWriteKeyValue(ee_kv_AdcWeightGain, true);
+  // check valid
+  ecg_calibrateAdcWeightGain();
+
   return ret;
 }
 
@@ -194,6 +199,12 @@ bool ee_readOrWriteKeyValue(ee_keyvalue_typeDef _key, bool _isRead)
       addr = ee_addr_bpmCalmMax;
       pdata = (u8 *)(mcu_getBpmCalMax());
       len = ee_addr_bpmCalmMax_size;
+      break;
+    case ee_kv_AdcWeightGain:
+      // Param7: ADC no signal weight value and max value gain
+      addr = ee_addr_AdcWeightGain;
+      pdata = (u8 *)(ecg_getAdcWeightGain());
+      len = ee_addr_AdcWeightGain_size;
       break;
 
 

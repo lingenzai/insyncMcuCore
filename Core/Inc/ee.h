@@ -53,7 +53,10 @@
 #define ee_addr_bpmCalmMax_size       (sizeof(mcu_bpmCalmMax_typeDef))
 #define ee_addr_bpmCalmMax_end        (ee_addr_bpmCalmMax + ee_addr_bpmCalmMax_size - 1)
 
-
+// ADC no signal weight value and max value gain in EEPROM
+#define ee_addr_AdcWeightGain         (ee_addr_bpmCalmMax_end + 1)
+#define ee_addr_AdcWeightGain_size    (sizeof(ecg_AdcWeightGain_typeDef))
+#define ee_addr_AdcWeightGain_end     (ee_addr_AdcWeightGain + ee_addr_AdcWeightGain_size - 1)
 
 
 /* type define ----------------------------------------------------------- */
@@ -65,6 +68,7 @@ typedef enum{
   ee_kv_motionPeriod,
   ee_kv_baseData,
   ee_kv_bpmCalmMax,
+  ee_kv_AdcWeightGain,
 
 
   ee_kv_max
