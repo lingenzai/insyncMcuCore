@@ -72,14 +72,15 @@ typedef struct{
   // config is valid flag
   u8 pulse_configIsValid;
 
-  // pulse Rsvi delay(unit: ms)
-  u8 pulse_Rsvi_ms;
   // pulse Rv delay(unit: ms)
   u8 pulse_Rv_delay_ms;
   // pulse numbers
   u8 pulse_num;
   // pulse width(unit: 0.1ms), so width / 10 = count of ms
   u8 pulse_width;
+  // pulse Rsvi delay(unit: ms)
+  u8 pulse_Rsvi_ms;
+
 
   // convert to Minutes(unit: minute)(total 24 bytes)
   pulse_time_typeDef pulse_timeBuf[PULSE_TIME_BUF_SIZE];

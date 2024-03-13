@@ -772,7 +772,7 @@ static void ecg_smRnDetect(void)
 
 #ifdef LiuJH_DEBUG
 		// twice continue escaped? restart R1 waiting...
-		if(ecg_RnEscaped >= ECG_ESCAPED_MAX_NUM){
+		if(ecg_RnEscaped > ECG_ESCAPED_MAX_NUM){
 		  // redo R detect, restart up ecg detection
 		  ecg_status = ecg_startup_status;
 		}else{

@@ -73,7 +73,8 @@
 // continue get Rn numbers we can pulsing
 #define ECG_RN_DETECTED_MIN_NUM     3 // 4  // 
 
-#define ECG_ESCAPED_MAX_NUM         2
+// R peak point escaped max number
+#define ECG_ESCAPED_MAX_NUM         1 // 0 // 2 // 
 
 #define ECG_ADC_CH_NUM              2
 #define ECG_RS_INDEX                0
@@ -84,7 +85,7 @@
 #define ECG_BPM_MIN                 65  // 50 // 
 
 // Avoid having two maximum values at the same time
-#define ECG_ADC_MAX_VALUE_GAIN    50
+#define ECG_ADC_MAX_VALUE_GAIN      50
 // ADC value weight of no signal
 #define ECG_ADC_NO_SIGNAL_WEIGHT    50
 
