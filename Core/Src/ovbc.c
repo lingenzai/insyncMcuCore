@@ -83,18 +83,37 @@ static void ovbc_cbSmOnePulse(void)
 static void ovbc_cbSmVnegEn(void)
 {
 #ifdef LiuJH_OVBC
-      // test only
-      ovbc_negTick[ovbc_Nindex++] = HAL_GetTick();
+  // test only
+  ovbc_negTick[ovbc_Nindex++] = HAL_GetTick();
 #endif
-  
-    // Reset VposEn pin
-    HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
-    // set VnegEn pin
-    HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_SET);
 
-    // we have send one pulse(high+low)
-    ovbc_status = ovbc_onePulseEnd_status;
+#ifdef LiuJH_OVBC2
+  // Test only
 
+  // Reset VposEn pin
+  HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
+  // set VnegEn pin
+  HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_SET);
+
+  // update tim6 prescaler and reinit tim6 for pulse
+  htim6.Init.Prescaler = 17;    // 2ms delay: 2 * (8 + 1) - 1 = 17
+  HAL_TIM_Base_Init(&htim6);
+
+  // update status
+  ovbc_status = ovbc_VnegEnabling_status;
+
+  // startup tim6 timer
+  HAL_TIM_Base_Start_IT(&htim6);
+
+#else
+  // Reset VposEn pin
+  HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_RESET);
+  // set VnegEn pin
+  HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_SET);
+
+  // we have send one pulse(high+low)
+  ovbc_status = ovbc_onePulseEnd_status;
+#endif
 }
 
 /*
@@ -108,24 +127,24 @@ static void ovbc_cbSmVnegEn(void)
 static void ovbc_cbSmVposEn(void)
 {
 #ifdef LiuJH_OVBC
-    // test only
-    ovbc_posTick[ovbc_Pindex++] = HAL_GetTick();
+  // test only
+  ovbc_posTick[ovbc_Pindex++] = HAL_GetTick();
 #endif
 
-    // Reset VnegEn pin
-    HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
-    // set VposEn pin
-    HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_SET);
+  // Reset VnegEn pin
+  HAL_GPIO_WritePin(CCM_PIN33_VNEG_EN_GPIO_Port, CCM_PIN33_VNEG_EN_Pin, GPIO_PIN_RESET);
+  // set VposEn pin
+  HAL_GPIO_WritePin(CCM_PIN32_VPOS_EN_GPIO_Port, CCM_PIN32_VPOS_EN_Pin, GPIO_PIN_SET);
 
-		// update tim6 prescaler and reinit tim6 for pulse
-		htim6.Init.Prescaler = ovbc_timPrePulse;
-		HAL_TIM_Base_Init(&htim6);
+  // update tim6 prescaler and reinit tim6 for pulse
+  htim6.Init.Prescaler = ovbc_timPrePulse;
+  HAL_TIM_Base_Init(&htim6);
 
-		// update status
-		ovbc_status = ovbc_VPonEnabling_status;
-		
-		// startup tim6 timer
-		HAL_TIM_Base_Start_IT(&htim6);
+  // update status
+  ovbc_status = ovbc_VPosEnabling_status;
+
+  // startup tim6 timer
+  HAL_TIM_Base_Start_IT(&htim6);
 }
 
 /*
@@ -254,13 +273,19 @@ void ovbc_cbStateMachine(void)
     case ovbc_VposEn_status:
       ovbc_cbSmVposEn();
       break;
-		case ovbc_VPonEnabling_status:
+		case ovbc_VPosEnabling_status:
 			// only update status
 			ovbc_status = ovbc_VnegEn_status;
 			break;
     case ovbc_VnegEn_status:
       ovbc_cbSmVnegEn();
       break;
+#ifdef LiuJH_OVBC2
+    case ovbc_VnegEnabling_status:
+      // only update status
+      ovbc_status = ovbc_onePulseEnd_status;
+      break;
+#endif
     case ovbc_onePulseEnd_status:
       ovbc_cbSmOnePulse();
       break;

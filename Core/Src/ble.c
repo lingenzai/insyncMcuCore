@@ -54,6 +54,9 @@ static bool ble_pulseShowFlag = false;
 // temp record this value for setting
 static u8 ble_VoutSetValue;
 
+// rocord SPI is bad or RSL10 is LPM
+static bool ble_Rsl10IsLpm;
+
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private var define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
 
@@ -773,10 +776,13 @@ static bool ble_isStopReq(u8 _reqId)
   bool ret = true;
 
 #ifdef LiuJH_DEBUG
-  if(_reqId == ble_p_stop_readingEcg)
+  if(_reqId == ble_p_stop_readingEcg
+    || _reqId == ble_p_error_vlaue){
     ret = true;
-  else
+  }
+  else{
     ret = false;
+  }
 #else
   switch(_reqId){
     // rsl10 told mcu: its status is connected with APP(0x62)
@@ -821,6 +827,57 @@ static bool ble_isStopReq(u8 _reqId)
 #endif
 
   return ret;
+}
+
+/*
+  brief:
+    1. Mcu firm version data format:
+      data: 01 23 01
+      note: Ver 1.23.1
+    2. 
+*/
+static void ble_reqReadFirmVersion(u8 _reqId)
+{
+  u8 *ptx = ble_spiTxBuf;
+  u16 len = sizeof(ble_spiTxBuf);
+  u32 num = 0;
+
+  // clear txbuf
+  memset(ptx, 0, len);
+
+  /* 1. send Date Time to RSl10 through SPI; */
+  // head
+  *ptx++ = BLE_P_HEAD;
+  // command id
+  *ptx++ = _reqId;
+
+  /*
+    3B_DATE Data Format:
+    Data：01 23 01  
+    Note：Ver 1.23.1
+  */
+  {
+    u8 verbuf[MCU_FIRM_VERSION_LEN] = MCU_FIRM_VERSION;
+
+    // fill in buf
+    for(int i = 0; i < MCU_FIRM_VERSION_LEN; i++){
+      *ptx++ = verbuf[i];
+    }
+  }
+  // length
+  num = ptx - ble_spiTxBuf;
+
+  // check xor
+  ptx = ble_spiTxBuf + SPI_SEND_NUM - 1;
+  *ptx = 0;
+  for(u32 i = 0; i < num; i++){
+    *ptx ^= ble_spiTxBuf[i];
+  }
+
+  // send the response to RSL10 through SPI in blocked mode
+  BLE_CS_ASSERTED;
+  HAL_SPI_Transmit(&hspi2, ble_spiTxBuf, len, BLE_SPI_TIMEOUT);
+  BLE_CS_DEASSERTED;
 }
 
 /*
@@ -1125,6 +1182,26 @@ static void ble_reqReadPulseConfig1(u8 _reqId)
   BLE_CS_DEASSERTED;
 }
 
+/*
+  brief:
+    1. Under certain conditions the pulse cannot be turned on;
+    2. such as:
+      force pulsing is working;
+      be charging;
+      
+*/
+static bool ble_enablePulseOn(void)
+{
+  bool ret = true;
+
+  // Dont enable pulse on in some conditions
+  if(fpulse_isWorking()   // force pulsing is working
+    || wpr_isCharging())  // we are charging
+    ret = false;
+
+  return ret;
+}
+
 
 /*
   brief:
@@ -1168,12 +1245,12 @@ static void ble_dealReqCommand(void)
       break;
     // startup pulsing(0x15)
     case ble_p_pulse_on:
-      if(fpulse_isWorking()){
-        ble_respUserReqOkOrErr(reqid, false);
-      }else{
+      if(ble_enablePulseOn()){
         pulse_bleConfigPulseOn(true);
         // response user OK
         ble_respUserReqOkOrErr(reqid, true);
+      }else{
+        ble_respUserReqOkOrErr(reqid, false);
       }
       break;
     // stop pulsing(0x16)
@@ -1315,6 +1392,10 @@ static void ble_dealReqCommand(void)
       // stop ecg
       ble_reqStopReadingEcg(reqid);
       break;
+    // RSL10 read MCU firm version(0x2B)
+    case ble_p_read_firm_version:
+      ble_reqReadFirmVersion(reqid);
+      break;
 
 
     // RSL10 read pulse working status(0x30)
@@ -1436,15 +1517,24 @@ static bool ble_commandNeedDeal(void)
   u32 len = sizeof(ble_spiRxBuf);
   u8 cs = 0;
 
+  if(*prx == BLE_INVALID_BYTE
+    && prx[BLE_P_COMMAND_INDEX] == ble_p_error_vlaue){
+    ble_Rsl10IsLpm = true;
+  }else{
+    ble_Rsl10IsLpm = false;
+  }
+
   // protocol head byte isn't 0xA5?
   if(*prx != BLE_P_HEAD) goto error;
 
   // command code is idle or connected(ble_p_rsl10IsIdle, ble_p_rsl10IsConnected)?
   if(prx[BLE_P_COMMAND_INDEX] == ble_p_rsl10IsIdle){
+#ifndef LiuJH_DEBUG
     if(pulse_blePulsingIsOn()){
       // pulse switch off in idle mode
       pulse_bleConfigPulseOn(false);
     }
+#endif
     goto error;
   }
 
@@ -1691,7 +1781,6 @@ static void ble_smReqWaiting(void)
 
   // still in this status? query loop continue
   if(ble_status == ble_reqWaiting_status){
-
 #ifdef LiuJH_DEBUG // only test: dont sleep
     // current status is timeout?
     if(HAL_GetTick() > ble_timeoutTick){
@@ -1817,6 +1906,13 @@ void ble_adcConvCpltCB(void)
 
 
 /*
+*/
+bool ble_Rsl10ChipIsLpm(void)
+{
+  return ble_Rsl10IsLpm;
+}
+
+/*
   brief:
     1. When ECG detects the R peak, set this value;
     2. 
@@ -1909,6 +2005,7 @@ void ble_init(void)
   ble_adcMinValue = ble_adcPeakMinValue = ADC_MAX_VALUE;
   ble_pulseShowFlag = false;
 //  ble_pulseOnAction = false;
+  ble_Rsl10IsLpm = false;
 
 
   ble_status = ble_inited_status;

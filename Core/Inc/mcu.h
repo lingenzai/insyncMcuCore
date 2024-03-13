@@ -8,71 +8,79 @@
 #ifndef INC_MCU_H_
 #define INC_MCU_H_
 
+// current firm version(BCD mode data)
+/*
+  ver a.b.c
+    It is BCD code; such as {00, 23, 22} is: ver 0.23.22;
+    a: dont release, so is 0;
+    b: is current month number;
+    c: is current day number
+*/
+#define MCU_FIRM_VERSION_LEN          3
+#define MCU_FIRM_VERSION              {00, 03, 12}  // Ver 0.3.12
+
 /* If we use wakeup config is DIV16 */
 // 37 * 1000 / 16 = 2368
-//#define RTC_WAKEUP_TIME         2368
+//#define RTC_WAKEUP_TIME             2368
 // 32768 / 16 = 2048
-#define RTC_WAKEUP_TIME         2048
-// DONT add ()
-#define RTC_WAKEUP_TIME_1ms     RTC_WAKEUP_TIME / 1000
-#define RTC_WAKEUP_COUNT_1S     (1 * RTC_WAKEUP_TIME)
-#define RTC_WAKEUP_TIME_2S      (2 * RTC_WAKEUP_TIME)
-#define RTC_WAKEUP_TIME_3S      (3 * RTC_WAKEUP_TIME)
-#define RTC_WAKEUP_TIME_5S      (5 * RTC_WAKEUP_TIME)
-#define RTC_WAKEUP_TIME_10S     (10 * RTC_WAKEUP_TIME)
-#define RTC_WAKEUP_TIME_20S     (20 * RTC_WAKEUP_TIME)
+#define RTC_WAKEUP_TIME               2048
 
-#define TIMEOUT_10MS            10
-#define TIMEOUT_20MS            20
-#define TIMEOUT_50MS            50
-#define TIMEOUT_100MS           100
-#define TIMEOUT_150MS           150
-#define TIMEOUT_180MS           180
+#define TIMEOUT_10MS                  10
+#define TIMEOUT_20MS                  20
+#define TIMEOUT_50MS                  50
+#define TIMEOUT_100MS                 100
+#define TIMEOUT_150MS                 150
+#define TIMEOUT_180MS                 180
 /*
-#define TIMEOUT_200MS           200
-#define TIMEOUT_350MS           350
-#define TIMEOUT_500MS           500
-#define TIMEOUT_600MS           600
+#define TIMEOUT_200MS                 200
+#define TIMEOUT_350MS                 350
+#define TIMEOUT_500MS                 500
+#define TIMEOUT_600MS                 600
 */
-#define TIMEOUT_800MS           800
-#define TIMEOUT_1S              1000
-#define TIMEOUT_2S              2000
-#define TIMEOUT_2P5S            2500
-#define TIMEOUT_5S              5000
-#define TIMEOUT_10S             10000
-#define TIMEOUT_15S             15000
-#define TIMEOUT_20S             20000   // AnimalTest release version value
-#define TIMEOUT_30S             30000
+#define TIMEOUT_800MS                 800
+#define TIMEOUT_1S                    1000
+#define TIMEOUT_2S                    2000
+#define TIMEOUT_2P5S                  2500
+#define TIMEOUT_5S                    5000
+#define TIMEOUT_10S                   10000
+#define TIMEOUT_15S                   15000
+#define TIMEOUT_20S                   20000   // AnimalTest release version value
+#define TIMEOUT_30S                   30000
 // one minute timeout
-#define TIMEOUT_60S             60000
+#define TIMEOUT_60S                   60000
 // 2 minutes timeout
-//#define TIMEOUT_120S            120000
+//#define TIMEOUT_120S                120000
 // 10 minutes timeout
-#define TIMEOUT_600S            600000
+//#define TIMEOUT_600S                  600000
 
-#define BUFFER_SIZE_1KB         1024
-#define BUFFER_SIZE_512B        512
-#define BUFFER_SIZE_256B        256
+#define BUFFER_SIZE_1KB               1024
+#define BUFFER_SIZE_512B              512
+#define BUFFER_SIZE_256B              256
 
 // ask RSL10 enter LPM times
-#define ASK_RSL10_LPM_NUM           3
+#define ASK_RSL10_LPM_NUM             3
 // RTC wakeup timer max second time(18 hours)
-#define RTC_WKUP_TIMER_COUNT_MAX    (64800) // (18 * 60 * 60)
+#define RTC_WKUP_TIMER_COUNT_MAX      (64800) // (18 * 60 * 60)
 // max seconds of each day(24 * 60 * 60)
-#define MCU_MAX_SECOND_EACH_DAY     (86400) // (24 * 60 * 60)
+#define MCU_MAX_SECOND_EACH_DAY       (86400) // (24 * 60 * 60)
 // max minutes of each day(24 * 60)
-#define MCU_MAX_MINUTE_EACH_DAY     (1440)  // (24 * 60)
+#define MCU_MAX_MINUTE_EACH_DAY       (1440)  // (24 * 60)
 
 // data struct stored in EEPROM or spi flash is valid flag value
-#define MCU_DATA_STRUCT_VALID_VALUE 0x4F  // ascii code of "O" of "OK"
+#define MCU_DATA_STRUCT_VALID_VALUE   0x4F  // ascii code of "O" of "OK"
 
-#define MCU_SPI_BLE             mcu_spi_bleSending_status
-#define MCU_SPI_FLASH           mcu_spi_flashSending_status
+#define MCU_SPI_BLE                   mcu_spi_bleSending_status
+#define MCU_SPI_FLASH                 mcu_spi_flashSending_status
 
 // accel redo period default value(15S)
 #define MCU_MOTION_PERIOD_DEFAULT     6 // 15 // 
 // accel motion and motionless threshold default value
 #define MCU_MOTION_THRESHOLD_DEFAULT  300
+
+// mcu is running min times(unit: ms)
+#define MCU_TICK_MIN_FOR_RESET        TIMEOUT_10S
+// period time of magnet exist
+#define MCU_EXIST_MAGNET_PERIOD_TICK  TIMEOUT_1S
 
 /*
 */

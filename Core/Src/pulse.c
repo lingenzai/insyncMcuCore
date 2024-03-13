@@ -215,11 +215,11 @@ static void pulse_RvSenseSwitch(bool _isSet)
   if(_isSet){
     if(HAL_GPIO_ReadPin(CCM_PIN31_PULSE_SWITCH_GPIO_Port, CCM_PIN31_PULSE_SWITCH_Pin) == GPIO_PIN_RESET
       && HAL_GetTick() > pulse_RvSenseSwitchTick){
-      // reset Rv-Sense switch off pin
+      // set Rv-Sense switch off pin
       HAL_GPIO_WritePin(CCM_PIN31_PULSE_SWITCH_GPIO_Port, CCM_PIN31_PULSE_SWITCH_Pin, GPIO_PIN_SET);
     }
   }else{
-    // set Rv-Sense switch on pin
+    // reset Rv-Sense switch on pin
     HAL_GPIO_WritePin(CCM_PIN31_PULSE_SWITCH_GPIO_Port, CCM_PIN31_PULSE_SWITCH_Pin, GPIO_PIN_RESET);
   }
 }

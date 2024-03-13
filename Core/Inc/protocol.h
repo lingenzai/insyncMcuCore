@@ -93,6 +93,8 @@ typedef enum{
   ble_p_read_StEcg_flash,
   // stop ecg(one of six ecg) reading(0x2A)
   ble_p_stop_readingEcg,
+  // RSL10 read MCU firm version(0x2B)
+  ble_p_read_firm_version,
 
 
   // RSL10 read pulse working status(0x30)

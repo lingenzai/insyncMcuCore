@@ -215,6 +215,67 @@ static bool mcu_noDeviceWorking(void)
 }
 
 /*
+  brief:
+    1. We always monitor magnet for resetting RSL10(avoid mcu dont enter into LPM);
+    2. conditions:
+      a. Mcu is running for sometimes(ex. 10s);
+      b. RSL10 MUST is LPM mode;
+      c. We have found magnet for 1 second;
+    3. reset MCU;
+*/
+static void mcu_monitorMegnet(void)
+{
+  // exist magnet flag
+  static bool exist = false;
+  // the period tick of exist magnet
+  static u32 ptick;
+
+  // Mcu is running for sometimes?
+  if(HAL_GetTick() < MCU_TICK_MIN_FOR_RESET) return;
+
+  // RSL10 MUST is not LPM mode?
+  if(!ble_Rsl10ChipIsLpm()) return;
+
+  // check magnet for 1 second
+  if(HAL_GPIO_ReadPin(CCM_PIN10_WKUP_INTR_GPIO_Port, CCM_PIN10_WKUP_INTR_Pin)){
+    /* exist magnet */
+
+    // the start time of exist magnet?
+    if(exist){
+      // check period somtimes
+      if(HAL_GetTick() >= ptick){
+        // reset MCU and RSL10
+        HAL_NVIC_SystemReset();
+      }
+    }else{
+      // the first time of checking out magnet is exist
+      exist = true;
+      ptick = HAL_GetTick() + MCU_EXIST_MAGNET_PERIOD_TICK;
+    }
+  }else{
+    /* no exist magnet */
+    exist = false;
+  }
+}
+
+/*
+*/
+static void mcu_redoMotionCheck(void)
+{
+    if(HAL_GetTick() < mcu_motionTick) return;
+  
+    accel_startup();
+
+#ifndef LiuJH_DEBUG
+    // test only
+    mcu_motionTick = HAL_GetTick() + TIMEOUT_5S;
+#else
+    // set next startup timetick
+    mcu_motionTick = HAL_GetTick() + mcu_motionCfg.mcu_motionPeriod * 1000;
+#endif
+}
+
+/*
 */
 static void mcu_workDriven(void)
 {
@@ -232,17 +293,12 @@ static void mcu_workDriven(void)
   */
 
   // redo motion check
-  if(HAL_GetTick() < mcu_motionTick) return;
+  mcu_redoMotionCheck();
 
-  accel_startup();
+  // always monitor megnet for resetting RSL10(avoid mcu dont enter into LPM)
+  mcu_monitorMegnet();
 
-#ifndef LiuJH_DEBUG
-	// test only
-	mcu_motionTick = HAL_GetTick() + TIMEOUT_5S;
-#else
-  // set next startup timetick
-  mcu_motionTick = HAL_GetTick() + mcu_motionCfg.mcu_motionPeriod * 1000;
-#endif
+  // 
 }
 
 /*
@@ -794,7 +850,7 @@ void mcu_startup(void)
   // NOTE: this process have 10ms delay;
   accel_startup();
 
-  HAL_TIM_Base_Start_IT(&htim6);
+//  HAL_TIM_Base_Start_IT(&htim6);
 
   // set next startup timetick
   mcu_motionTick = HAL_GetTick() + mcu_motionCfg.mcu_motionPeriod * 1000;

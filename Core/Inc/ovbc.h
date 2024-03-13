@@ -23,6 +23,11 @@
 #define LiuJH_OVBC
 #endif
 
+#ifndef LiuJH_DEBUG
+// only test: 5ms pos + 2ms neg pulsing
+#define LiuJH_OVBC2
+#endif
+
 typedef enum{
   /*
   */
@@ -65,13 +70,21 @@ typedef enum{
   	2. this status is no use;
   	3. update to next status only;
   */
-  ovbc_VPonEnabling_status,
+  ovbc_VPosEnabling_status,
   /*
   	1. reset VposEn pin and set VnegEn pin;
   	2. ONE pulse is finished;
   	3. upate to next status;
   */
   ovbc_VnegEn_status,
+#ifdef LiuJH_OVBC2
+  /*
+    1. as same with chipEnabling status and willChipEnable status;
+    2. this status is no use;
+    3. update to next status only;
+  */
+  ovbc_VnegEnabling_status,
+#endif
   /*
   	1. according pulse num of pulse config;
   	2. if we will continue pulsing, reset VnegEn pin and set VposEn pin,
