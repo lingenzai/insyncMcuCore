@@ -55,10 +55,14 @@
 #define ECG_SLOPE_NUM               4
 // use 0.80 as slope weight
 #define ECG_SLOPE_WEIGHT            4 / 5
-// use 0.85 as R value weight
-#define ECG_R_VALUE_WEIGHT          9 / 10  // 17 / 20  /* 29/32 */	// 	
+
+// use 0.7 as R1-->R2 value weight
+#define ECG_R_VALUE_WEIGHT1         7 / 10
+// use 0.9 as Rn value weight
+#define ECG_R_VALUE_WEIGHT          9 / 10
+
 // Rn half of move window size
-#define ECG_Rn_MW_HALF_SIZE         3 // 2  // 4 // 
+#define ECG_Rn_MW_HALF_SIZE         6 // 5 // 3 // 2  // 4 // 
 // Rn detect data num
 #define ECG_RN_DETECT_NUM           3
 // 4 + 1 + 4, guess Rn peak point is in middle of these points
@@ -67,17 +71,29 @@
 #define ECG_Rn_MW_Weight            2
 
 // continue get Rn numbers we can pulsing
-#define ECG_RN_DETECTED_MIN_NUM     4
+#define ECG_RN_DETECTED_MIN_NUM     3 // 4  // 
 
-#define ECG_ESCAPED_MAX_NUM         2
+// R peak point escaped max number
+#define ECG_ESCAPED_MAX_NUM         1 // 0 // 2 // 
 
 #define ECG_ADC_CH_NUM              2
 #define ECG_RS_INDEX                0
 #define ECG_RV_INDEX                1
+// weight of bpm change value
+#define ECG_BPM_WEIGHT              10
+
+#define ECG_BPM_MIN                 65  // 50 // 
+
+// Avoid having two maximum values at the same time
+#define ECG_ADC_MAX_VALUE_GAIN      50
+// ADC value weight of no signal
+#define ECG_ADC_NO_SIGNAL_WEIGHT    50
 
 
-
-
+#ifndef LiuJH_DEBUG
+// test of using Rs-RDET and Rv-RDET data of Animal Test 1
+#define LiuJH_ECG
+#endif
 
 
 /* type define ****************************************************/
@@ -93,33 +109,33 @@ typedef enum{
     2. check wakeup reason, if magnet hall go into idle status;
     3. if RTC timer wakeup, goto startup status;
   */
-  ecg_inited_status,
+  ecg_inited_status = 0,
   /*
     1. do noting;
     2. no working;
   */
-  ecg_idle_status,
+  ecg_idle_status,          // 1
   /*
     1. startup adc;
     2. go into next status;
   */
-  ecg_startup_status,
+  ecg_startup_status,       // 2
   /*
     1. only store u16 data into buf, and sample peak point;
     2. dont convert to u8 data;
   */
-  ecg_stableWaiting_status,
+  ecg_stableWaiting_status, // 3
   /*
     1. only synchronous Loop stateMachine and ADC callback;
     2. update all vars of buf in Loop stateMachine, and AdcCB do nothing;
   */
-  ecg_sync1_status,
+  ecg_sync1_status,         // 4
   /*
     1. adc sample start, and record adc data;
     2. until 2.5 s, make sure include one R peak point;
     3. so go into R1detect status;
   */
-  ecg_R1waiting_status,
+  ecg_R1waiting_status,     // 5
   /*
     1. start flag: magnet wakeup mcu or adc sample start;
     2. job brief: 
@@ -127,7 +143,7 @@ typedef enum{
       calculate V(average value of the slope);
     3. stop flag: get R1 and V;
   */
-  ecg_R1Detect_status,
+  ecg_R1Detect_status,      // 6
   /*
     1. start flag: get R1 and V;
     2. job brief:
@@ -135,19 +151,19 @@ typedef enum{
       calculate RRi value;
     3. stop flag: get R2 and RRi value;
   */
-  ecg_R2Detect_status,
+  ecg_R2Detect_status,      // 7
   /*
     1. start flag: get R2 peak point;
     2. job brief:
       update all vars about buf in adc callback;
   */
-  ecg_Rnwaiting_status,
+  ecg_Rnwaiting_status,     // 8
   /*
     1. RRi and slopeV got it;
     2. waiting MCU working;
     3. if MCU start working, goto next status;
   */
-  ecg_Rnwaiting2_status,
+  ecg_Rnwaiting2_status,    // 9
   /*
     1. start flag: get R2 and RRi value;
     2. job brief:
@@ -155,16 +171,28 @@ typedef enum{
       ...
     3. stop flag: ADC sample stop;
   */
-  ecg_RnDetect_status,
+  ecg_RnDetect_status,      // 10
 
   /*
     1. 
   */
-  ecg_RnDetected_status,
+  ecg_RnDetected_status,    // 11
 
 
   pulse_Max_status
 } ecg_Status_typeDef;
+
+/*
+*/
+typedef struct{
+  u8 isValid;
+
+
+  // ADC value weight of no signal
+  u8 ecg_AdcNoSignalWeight;
+  // Avoid having two maximum values at the same time
+  u8 ecg_AdcMaxValueGain;
+} ecg_AdcWeightGain_typeDef;
 
 
 
@@ -179,6 +207,10 @@ extern void ecg_init(void);
 extern void ecg_stateMachine(void);
 extern void ecg_startup(void);
 extern void ecg_adcConvCpltCB(u8 _curCh);
+extern void ecg_calibrateAdcWeightGain(void);
+extern ecg_AdcWeightGain_typeDef* ecg_getAdcWeightGain(void);
+extern u8 ecg_getStatus(void);
+extern void ecg_getAdcPeakValue(u16 *_pmax, u16 *_pmin);
 extern u8 ecg_getBpm(void);
 extern u32 ecg_getRnTick(void);
 extern bool ecg_getRsviAbout(u8 *_pdata);

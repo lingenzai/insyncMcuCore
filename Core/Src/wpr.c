@@ -410,8 +410,13 @@ bool wpr_isCharging(void)
 
 void wpr_setChargeSwitch(bool _isOn)
 {
-  if(_isOn)
+  if(_isOn){
+    // is pulsing? disable it
+    if(pulse_blePulsingIsOn())
+      pulse_bleConfigPulseOn(false);
+
     wpr_chargeSwitch = wpr_chargeSwitch_on;
+  }
   else
     wpr_chargeSwitch = wpr_chargeSwitch_off;
 }

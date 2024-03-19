@@ -32,6 +32,8 @@ static mcu_Voutset_typeDef mcu_Voutset;
 
 //static u32 mcu_tick = 0;
 
+static mcu_baseData_typeDef mcu_baseData;
+static mcu_bpmCalmMax_typeDef mcu_bpmCalmMax;
 
 
 /*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv private var define end vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
@@ -213,6 +215,67 @@ static bool mcu_noDeviceWorking(void)
 }
 
 /*
+  brief:
+    1. We always monitor magnet for resetting RSL10(avoid mcu dont enter into LPM);
+    2. conditions:
+      a. Mcu is running for sometimes(ex. 10s);
+      b. RSL10 MUST is LPM mode;
+      c. We have found magnet for 1 second;
+    3. reset MCU;
+*/
+static void mcu_monitorMegnet(void)
+{
+  // exist magnet flag
+  static bool exist = false;
+  // the period tick of exist magnet
+  static u32 ptick;
+
+  // Mcu is running for sometimes?
+  if(HAL_GetTick() < MCU_TICK_MIN_FOR_RESET) return;
+
+  // RSL10 MUST is not LPM mode?
+  if(!ble_Rsl10ChipIsLpm()) return;
+
+  // check magnet for 1 second
+  if(HAL_GPIO_ReadPin(CCM_PIN10_WKUP_INTR_GPIO_Port, CCM_PIN10_WKUP_INTR_Pin)){
+    /* exist magnet */
+
+    // the start time of exist magnet?
+    if(exist){
+      // check period somtimes
+      if(HAL_GetTick() >= ptick){
+        // reset MCU and RSL10
+        HAL_NVIC_SystemReset();
+      }
+    }else{
+      // the first time of checking out magnet is exist
+      exist = true;
+      ptick = HAL_GetTick() + MCU_EXIST_MAGNET_PERIOD_TICK;
+    }
+  }else{
+    /* no exist magnet */
+    exist = false;
+  }
+}
+
+/*
+*/
+static void mcu_redoMotionCheck(void)
+{
+    if(HAL_GetTick() < mcu_motionTick) return;
+  
+    accel_startup();
+
+#ifndef LiuJH_DEBUG
+    // test only
+    mcu_motionTick = HAL_GetTick() + TIMEOUT_5S;
+#else
+    // set next startup timetick
+    mcu_motionTick = HAL_GetTick() + mcu_motionCfg.mcu_motionPeriod * 1000;
+#endif
+}
+
+/*
 */
 static void mcu_workDriven(void)
 {
@@ -230,21 +293,28 @@ static void mcu_workDriven(void)
   */
 
   // redo motion check
-  if(HAL_GetTick() < mcu_motionTick) return;
+  mcu_redoMotionCheck();
 
-  accel_startup();
-  // set next startup timetick
-  mcu_motionTick = HAL_GetTick() + mcu_motionCfg.mcu_motionPeriod * 1000;
+  // always monitor megnet for resetting RSL10(avoid mcu dont enter into LPM)
+  mcu_monitorMegnet();
+
+  // 
 }
 
 /*
   brief:
-    1. store all of important data in EEPROM;
+    1. store all of important data into EEPROM;
     2. 
 */
 static void mcu_storeKeyValue(void)
 {
-//  ee_storeKeyValue();
+#ifdef LiuJH_EE
+	// test only: entering into LPM may failed after writing EE
+  ee_storeKeyValue();
+#endif
+
+  // store pulse total number into eeprom
+  ee_readOrWriteKeyValue(ee_kv_baseData, false);
 }
 
 /*
@@ -288,25 +358,53 @@ static void mcu_setGpioFloatingInput(void)
     3. so we MUST wakeup twice every day;
     4. 
 */
-static void mcu_setLpmWakeupTimer(void)
+static u32 mcu_calWakeupSecond(void)
 {
-  u32 sec;
-  u32 startsec;
-  // seconds of 18 hours
-//  u32 secmax = 18 * 60 * 60;
+	ppulse_config_typeDef p = pulse_getConfig();
+	// init seconds of 18 hours
+	u32 sec = RTC_WKUP_TIMER_COUNT_MAX;
+	// current minute and config minute
+	u32 curm, conm;
+	int i;
 
-  // get current time
-  HAL_RTC_GetTime(&hrtc, &mcu_time, RTC_FORMAT_BIN);
+	// no valid time in pulse config buffer?
+	if(p->pulse_timeNum == 0) return sec;
 
-  // current time convert seconds
-  sec = (mcu_time.Hours * 60 + mcu_time.Minutes) * 60 + mcu_time.Seconds;
-  // get config pulse start time, convert seconds
-  startsec = pulse_getConfig()->pulse_start_time * 60;
+	// get current time
+	HAL_RTC_GetTime(&hrtc, &mcu_time, RTC_FORMAT_BIN);
 
-  // compare these, make sure wakeup time
-  if(sec >= startsec)
-    startsec += MCU_MAX_SECOND_EACH_DAY;
-  sec = startsec - sec;
+	// convert current time to minute(add 1 as weight)
+	curm = mcu_time.Hours * 60 + mcu_time.Minutes + 1;
+
+	// we have only one valid pulse config time?
+	if(p->pulse_timeNum == 1){
+		// get the only one config time(unit: minute)
+		conm = p->pulse_timeBuf[0].startTime;
+	}else{
+		// compare with pulse config start_time
+		for(i = 0; i < p->pulse_timeNum; i++){
+			if(curm < p->pulse_timeBuf[i].startTime){
+				// got it
+				break;
+			}
+		}
+
+		// i is index we want
+		if(i >= p->pulse_timeNum){
+			i = 0;
+		}
+
+		// get config time
+		conm = p->pulse_timeBuf[i].startTime;
+	}
+
+	// compare curm and conm
+	if(curm >= conm){
+		conm += MCU_MAX_MINUTE_EACH_DAY;
+	}
+
+	// get wakeup time (unit: second)
+	sec = conm * 60 - ((mcu_time.Hours * 60 + mcu_time.Minutes) * 60 + mcu_time.Seconds);
 
   // the max counter is 0xFFFF(unit: second) in 16bits wakeup mode, is: 18 hours
   if(sec > RTC_WKUP_TIMER_COUNT_MAX){
@@ -315,8 +413,26 @@ static void mcu_setLpmWakeupTimer(void)
     sec &= 0xFFFF;
   }
 
+	return sec;
+}
+
+/*
+  brief:
+    1. Wakeup timer max count value is 65535, unit is second;
+      it is 18.2 hours;
+    2. pulse wakeup time is 0:30-3:30, 3 hours;
+    3. so we MUST wakeup twice every day;
+    4. 
+*/
+static void mcu_setLpmWakeupTimer(void)
+{
+  u32 sec;
+
+	// calculate wakeup time(unit: second)
+	sec = mcu_calWakeupSecond();
+
 #ifndef LiuJH_DEBUG
-  // set 3s timer; ONLY test
+  // set 8s timer; ONLY test
 //  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, RTC_WAKEUP_TIME_5S, RTC_WAKEUPCLOCK_RTCCLK_DIV16);
   HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 8, RTC_WAKEUPCLOCK_CK_SPRE_16BITS);
 #else
@@ -333,7 +449,7 @@ static void mcu_enterStandbyMode(void)
 {
 #ifndef LiuJH_DEBUG
   // test only for LPM
-
+	mcu_setLpmWakeupTimer();
 #else
 
   /* NOW: we can go into LPM */
@@ -543,8 +659,6 @@ void mcu_allStateMachine(void)
 
   // pulse state machine process
   pulse_StateMachine();
-  // start state machine
-  ovbc_stateMachine();
 
   // ACCEL state machine process
   accel_stateMachine();
@@ -629,6 +743,9 @@ void mcu_calibrateMotionPeriod(void)
 
     // set valid
     p->isValid = MCU_DATA_STRUCT_VALID_VALUE;
+
+		// store this key value into EEPROM
+		ee_readOrWriteKeyValue(ee_kv_motionPeriod, false);
   }
 }
 
@@ -647,10 +764,47 @@ void mcu_calibrateVoutset(void)
 
     // set valid
     p->isValid = MCU_DATA_STRUCT_VALID_VALUE;
+
+		// store this key value into EEPROM
+		ee_readOrWriteKeyValue(ee_kv_VoutSet, false);
   }
 
   // NOTICE: config init this pin again
   mcu_setVoutsetPin((u8)p->value);
+}
+
+/*
+*/
+void mcu_calibrateBaseData(void)
+{
+  mcu_baseData_typeDef *p = &mcu_baseData;
+
+  // unvalid? set default
+  if(p->isValid ^ MCU_DATA_STRUCT_VALID_VALUE){
+    p->mcu_pulseTotalNum = 0;
+
+    p->isValid = MCU_DATA_STRUCT_VALID_VALUE;
+
+    // store this key value into EEPROM
+    ee_readOrWriteKeyValue(ee_kv_baseData, false);
+  }
+}
+
+/*
+*/
+void mcu_calibrateBpmCalmMax(void)
+{
+  mcu_bpmCalmMax_typeDef *p = &mcu_bpmCalmMax;
+
+  // unvalid? set default
+  if(p->isValid ^ MCU_DATA_STRUCT_VALID_VALUE){
+    p->mcu_bpmCalmMax = PULSING_BPM_CALM_MAX;
+
+    p->isValid = MCU_DATA_STRUCT_VALID_VALUE;
+
+    // store this key value into EEPROM
+    ee_readOrWriteKeyValue(ee_kv_bpmCalmMax, false);
+  }
 }
 
 /*
@@ -672,6 +826,20 @@ mcu_Voutset_typeDef *mcu_getVoutset(void)
 }
 
 /*
+*/
+mcu_baseData_typeDef *mcu_getBaseData(void)
+{
+  return &mcu_baseData;
+}
+
+/*
+*/
+mcu_bpmCalmMax_typeDef *mcu_getBpmCalMax(void)
+{
+  return &mcu_bpmCalmMax;
+}
+
+/*
   brief:
     1. start up all device base mcu, such as accel;
     2. 
@@ -682,7 +850,7 @@ void mcu_startup(void)
   // NOTE: this process have 10ms delay;
   accel_startup();
 
-  HAL_TIM_Base_Start_IT(&htim6);
+//  HAL_TIM_Base_Start_IT(&htim6);
 
   // set next startup timetick
   mcu_motionTick = HAL_GetTick() + mcu_motionCfg.mcu_motionPeriod * 1000;

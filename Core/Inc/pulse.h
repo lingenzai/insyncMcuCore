@@ -25,13 +25,14 @@
 // dont pulse default(00:00 - 00:00) convert minutes
 #define PULSE_START_TIME_DEFAULT    0
 #define PULSE_END_TIME_DEFAULT      0
+#define PULSE_TIME_NUM_DEFAULT			0
 
 
 // format: YY:MM:DD-HH:MM convert minutes: (((YY * 12 + MM) * 31) * 24 + HH) * 60
 // pulse_unpuling_start_dt default value:  2024-02-08 00:00 
 #define UNPULSING_PERIOD_START_Y_DEFAULT  24
-#define UNPULSING_PERIOD_START_MO_DEFAULT 2
-#define UNPULSING_PERIOD_START_D_DEFAULT  8
+#define UNPULSING_PERIOD_START_MO_DEFAULT 5
+#define UNPULSING_PERIOD_START_D_DEFAULT  1
 #define UNPULSING_PERIOD_START_H_DEFAULT  0
 #define UNPULSING_PERIOD_START_MI_DEFAULT 0
 // (((24 * 12 + 2) * 31 + 8) * 24 + 0) * 60 + 0 =  12,957,120 ( 0x00 C5 B5 C0 )
@@ -39,12 +40,28 @@
 
 // pulse_unpuling_end_dt default value:  2024-02-18 00:00 
 #define UNPULSING_PERIOD_END_Y_DEFAULT    24
-#define UNPULSING_PERIOD_END_MO_DEFAULT   2
-#define UNPULSING_PERIOD_END_D_DEFAULT    18
+#define UNPULSING_PERIOD_END_MO_DEFAULT   5
+#define UNPULSING_PERIOD_END_D_DEFAULT    6
 #define UNPULSING_PERIOD_END_H_DEFAULT    0
 #define UNPULSING_PERIOD_END_MI_DEFAULT   0
 // (((24 * 12 + 2) * 31 + 18) * 24 + 0) * 60 + 0 = 12,971,520 ( 0x00 C5 EE 00 )
-#define UNPULSING_PERIOD_END_DT_DEFAULT    (0x00C5EE00)
+#define UNPULSING_PERIOD_END_DT_DEFAULT   (0x00C5EE00)
+
+// up to six groups of pulse time(start time and end time)
+#define PULSE_TIME_BUF_SIZE							6
+#define PULSE_TIME_CONFIG3_INDEX					3
+
+// record Rv-Sense switch time(unit: ms) after pulse end
+// so Rsvi + RvDelay + period(- 10) = 40 + period
+#define PULSE_RV_SENSE_SWITCH_PERIOD      110  // 80  // 
+
+
+/*
+*/
+typedef struct{
+	u16 startTime;
+	u16 endTime;
+} pulse_time_typeDef;
 
 /*
   1. store config params from USER;
@@ -55,18 +72,21 @@ typedef struct{
   // config is valid flag
   u8 pulse_configIsValid;
 
-  // pulse Rsvi delay(unit: ms)
-  u8 pulse_Rsvi_ms;
   // pulse Rv delay(unit: ms)
   u8 pulse_Rv_delay_ms;
   // pulse numbers
   u8 pulse_num;
   // pulse width(unit: 0.1ms), so width / 10 = count of ms
   u8 pulse_width;
+  // pulse Rsvi delay(unit: ms)
+  u8 pulse_Rsvi_ms;
 
-  // convert to Minutes(unit: minute)
-  u32 pulse_start_time;
-  u32 pulse_end_time;
+
+  // convert to Minutes(unit: minute)(total 24 bytes)
+  pulse_time_typeDef pulse_timeBuf[PULSE_TIME_BUF_SIZE];
+	// avaliable time num(max is 6, min is 0)
+	// It is no valid if both start time and end time are 0
+  u8 pulse_timeNum;
 } pulse_config_typeDef, *ppulse_config_typeDef;
 
 // rocord dont pulsing data&time period(sotre in EE before LPM)

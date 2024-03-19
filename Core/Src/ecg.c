@@ -51,6 +51,8 @@ static u32 ecg_bpm[ECG_ADC_CH_NUM];
 static u32 ecg_RsviTimeMs;
 // record Rn window min point num and max point num
 static u32 ecg_RnWmin, ecg_RnWmax;
+// half point of (bpm - 5) and (bpm + 5)
+static u32 ecg_RnHalfWeight;
 
 
 // record num of Rn detected
@@ -67,7 +69,110 @@ static u32 ecg_adcTrimPeakTick;
 // trim RDET adc sample some times at first
 // and then it is flag of the first data tick in buffer
 static u32 ecg_adcStableTick;
+// record redo because too little bpm
+static bool ecg_detectAgain = false;
+// record ADC no signal weight value and max value gain
+static ecg_AdcWeightGain_typeDef ecg_AdcWeightGain;
 
+#ifdef LiuJH_ECG
+// record adc data of Rs-RDET and Rv-RDET channel
+static u8 ecg_adcBuf[2][1380] = {
+  { // Rs-RDET: 32 * 43 + 4 = 1380 data
+    138,137,140,139,164,140,179,175,175,178,164,170,153,158,144,148,137,140,131,133,128,129,127,128,126,126,126,126,125,125,124,124,
+    124,123,129,126,136,134,133,134,182,145,189,212,158,172, 88,145,105, 88,124,118,127,126,126,127,121,124,115,118,110,110,112,111,
+    113,112,114,113,115,115,116,116,117,116,117,117,118,117,118,118,118,118,118,118,117,118,116,117,114,115,111,113,104,108, 92, 98,
+    128,123,134,132,138,136,139,139,160,140,181,174,178,181,167,173,155,161,145,150,138,141,132,134,128,129,127,127,125,125,125,125,
+    125,125,125,125,124,124,124,124,124,124,126,125,135,130,135,137,149,135,209,187,170,187,127,157, 86, 83,118,104,127,125,128,127,
+    124,127,118,121,110,110,110,110,110,110,111,111,112,111,113,113,115,114,116,115,117,116,118,117,118,118,119,118,119,119,119,119,
+    116,117,114,115,109,112,100,105, 87, 94,107, 97,122,115,131,127,136,134,138,137,147,139,179,168,181,182,170,176,138,142,133,135,
+    128,130,126,126,125,125,125,125,124,124,125,125,126,126,125,126,125,125,125,125,125,125,125,125,127,126,135,130,136,138,145,135,
+    216,177,174,193,149,160, 82, 85,116,101,126,124,127,127,125,126,119,122,114,116,112,113,111,111,110,110,111,110,111,111,112,112,
+    113,113,114,114,115,115,116,116,117,117,118,117,118,118,119,119,119,119,119,119,118,118,116,117,114,115,109,112,101,106, 89, 96,
+    106, 95,121,114,130,126,135,133,138,137,139,139,169,152,179,177,172,177,161,167,150,155,142,146,136,138,131,133,128,130,126,127,
+    125,125,125,125,125,125,125,125,126,125,126,126,125,125,125,125,125,125,125,125,125,125,130,127,139,135,135,138,166,139,199,220,
+    164,179, 94,152, 99, 83,125,116,127,127,127,128,123,126,118,121,110,111,110,110,110,110,111,111,112,112,113,113,116,116,117,117,
+    118,117,118,118,118,118,118,118,118,118,118,118,116,117,114,116,110,112,102,106,118,111,129,124,135,132,138,137,139,139,170,156,
+    178,177,170,175,159,165,149,154,141,145,136,138,131,134,128,129,126,126,126,126,126,126,125,126,125,125,125,125,126,125,132,128,
+    192,150,191,213,159,173, 80,117,108, 88,127,121,128,128,127,128,121,124,116,119,112,114,110,111,109,110,110,109,110,110,111,110,
+    112,112,114,113,115,114,116,115,117,116,117,117,118,118,118,118,118,118,117,117,115,116,111,113,105,109, 95,101, 95, 87,114,106,
+    126,121,133,130,137,135,139,138,155,140,179,172,155,161,146,150,139,142,132,135,128,130,127,127,126,127,125,126,125,125,125,125,
+    125,125,124,124,123,123,123,123,123,123,125,124,131,127,138,136,133,135,184,146,192,215,160,174, 83,129,107, 87,128,122,128,129,
+    126,128,121,124,115,118,112,113,110,111,109,109,109,109,110,110,111,111,113,112,116,116,117,117,117,117,118,118,118,118,118,118,
+    118,118,118,118,117,117,115,116,112,113,106,109, 95,102, 92, 88,133,130,137,135,139,138,155,140,179,172,178,181,168,174,156,162,
+    146,151,138,141,131,134,129,129,127,128,126,127,125,126,126,126,125,126,125,125,124,124,123,123,129,126,137,134,133,135,176,143,
+    197,221,163,178, 89,151,101, 84,124,117,127,126,126,127,120,123,115,117,111,113,109,110,109,109,110,109,111,110,112,111,113,113,
+    114,114,115,115,116,116,117,117,118,118,118,118,119,119,119,119,118,119,118,118,116,117,114,115,110,112,104,108, 92, 99,100, 87,
+    134,132,138,136,139,138,165,140,182,177,178,181,165,172,153,159,143,148,135,139,130,132,128,129,126,127,125,125,125,125,124,124,
+    124,124,123,123,123,123,125,123,132,127,136,136,137,134,207,160,183,203,154,167, 79,104,111, 92,126,122,127,127,114,117,111,113,
+    110,111,110,110,112,112,114,113,115,114,116,115,117,117,118,117,118,118,118,118,118,118,119,119,118,118,117,118,116,117,114,115,
+    110,112,102,106, 88, 96,105, 93,120,113,130,126,135,133,138,137,139,139,178,166,182,183,172,178,158,165,147,152,128,130,126,127,
+    125,126,124,125,124,124,125,125,125,126,125,125,124,124,124,124,131,127,137,136,136,135,191,152,187,209,157,170, 77,115,107, 86,
+    127,121,128,128,115,118,112,113,110,111,110,110,110,110,111,111,112,112,114,113,115,114,116,115,117,116,118,117,119,119,119,119,
+    119,119,118,119,117,118,115,116,112,114,105,109, 94,100, 97, 86,115,107,127,122,133,131,137,136,139,138,174,158,182,181,173,178,
+    160,167,149,154,140,144,134,137,129,132,126,127,125,125,125,125,124,125,125,124,126,125,126,126,125,125,125,125,126,125,130,127,
+    139,135,136,137,173,144,195,219,161,176, 84,150, 99, 80,125,117,128,128,127,128,122,125,116,119,112,114,110,111,110,110,110,110,
+    113,112,114,114,116,115,117,116,117,117,118,118,118,118,119,118,119,119,118,118,118,118,117,118,116,117,114,115, 88, 94,110,100,
+    123,117,131,128,136,134,138,137,159,139,178,172,175,178,164,170,152,158,144,148,137,140,132,134,129,131,127,128,125,126,126,125,
+    125,126,125,125,126,127,126,126,125,125,125,125,125,125,127,126,136,131,137,139,142,134,223,173,179,198,151,163, 81, 84,117,101,
+    125,127,120,123,116,118,112,114,111,112,110,111,110,110,111,110,112,111,113,112,114,114,115,115,116,116,117,117,119,119,119,119,
+    119,119,119,119,118,118,116,117,112,114,107,110, 97,102, 88, 90,110,101,124,118,132,128,136,134,139,138,166,143,179,176,173,178,
+    162,168,151,156,142,146,136,139,131,134,128,129,127,127,127,127,126,127,126,126,126,126,126,126,126,126,125,125,124,124,124,124,
+    125,124,129,126,138,134,134,137,161,138,206,212,168,185, 95,155, 94, 78,124,113,128,128,128,128,123,126,117,120,113,115,111,112,
+    110,110,110,110,111,110,112,111,113,113,114,114,115,115,116,116,118,118,118,118,118,118,119,119,119,119,118,118,116,117,113,115,
+    109,112,101,105, 87, 95,105, 93,120,113,130,126,139,139,173,160,178,178,170,175,158,164,148,153,140,144,134,137,130,132,128,129,
+    128,128,126,127,126,126,126,126,124,125,124,124,124,124,125,124,129,126,138,134,133,136,166,139,199,220,164,179, 91,152, 98, 80,
+    125,116,129,128
+  },
+  { // Rv-RDET: 32 * 43 + 4 = 1380 data
+    111,112,106,109,104,104,103,103,104,104,106,105,110,109,111,110,112,111,113,112,113,113,114,113,114,114,114,114,113,114,112,113,
+    111,111,114,112,122,117,132,128,141,136,147,144,138,145,114,127, 94,102, 87, 88,117,111,127,123,135,131,139,137,140,140,141,141,
+    142,142,142,142,143,142,143,143,142,143,141,142,139,140,137,138,136,137,135,136,134,135,137,135,147,141,171,162, 42,112, 80, 64,
+    103, 93,203,158,234,226,222,232,176,196,147,160,130,138,120,125,115,117,112,113,109,111,104,106,103,104,104,104,105,104,106,106,
+    108,107,109,108,110,110,112,111,113,112,113,113,114,114,114,114,114,114,114,114,113,113,112,112,112,111,118,114,129,123,137,133,
+    145,141,144,146,126,137,101,113, 86, 92, 86, 85, 96, 90,110,103,122,116,131,127,137,134,140,139,142,141,142,142,142,142,142,142,
+    142,142,141,142,140,141,138,139,137,138,136,136,135,135,134,134,137,135,147,141,160,163, 49, 85, 84, 69,105, 96,211,171,235,230,
+    215,231,171,190,119,123,114,116,111,113,110,111,107,110,104,105,104,104,105,104,106,105,107,107,109,108,110,109,111,110,112,111,
+    114,114,115,114,115,115,115,115,114,115,115,114,120,116,130,124,137,134,143,140,143,144,128,138,102,115, 83, 90, 79, 79, 88, 82,
+    103, 95,117,110,128,123,136,132,141,139,144,143,144,144,144,144,144,144,144,144,144,144,144,144,143,143,142,142,140,141,138,139,
+    136,137,135,136,134,134,135,134, 58,143, 78, 61,101, 91,184,127,232,217,230,235,134,142,122,127,115,118,112,113,110,111,110,110,
+    105,105,106,105,107,106,108,108,109,109,110,110,111,111,112,112,113,113,114,113,114,114,115,115,115,115,115,115,116,115,119,117,
+    128,123,137,133,139,138,139,139,131,137,109,121, 86, 97, 77, 80, 82, 78, 96, 89,111,104,124,118,134,130,140,137,143,142,145,144,
+    144,144,144,144,143,143,141,142,139,140,138,138,136,137,135,136,135,135,137,135,143,140,164,152, 41,128, 79, 62,102, 92,196,151,
+    229,221,220,228,181,202,150,164,132,140,121,126,115,118,112,113,110,111,106,108,104,105,104,104,105,105,106,106,107,106,108,108,
+    110,109,111,110,112,111,113,112,114,113,115,114,115,115,114,114,113,113,115,114,123,118,130,127,132,131,135,133,133,135,117,126,
+     97,106, 89, 91, 93, 90,104, 98,136,132,140,138,143,141,143,143,143,143,143,144,143,143,142,142,142,142,141,141,140,140,138,139,
+    136,137,135,136,135,135,134,134,135,134,140,137,161,146,103,166, 64, 43, 94, 81,171,103,225,207,225,229,193,215,158,173,137,146,
+    124,129,117,120,113,114,111,112,106,108,104,104,104,104,105,104,106,105,107,107,108,108,109,109,111,110,112,111,113,112,114,113,
+    115,114,115,115,115,115,115,115,113,114,112,112,112,111,118,114,126,122,132,130,138,135,139,140,125,134,104,115,104, 98,115,110,
+    126,121,134,130,139,136,141,140,142,142,143,142,143,143,143,143,143,143,142,142,140,141,139,140,135,134,140,137,161,146,121,173,
+    161,101,222,202,226,229,198,217,161,177,139,148,113,115,109,112,104,106,103,104,104,103,105,104,106,106,108,107,109,108,110,109,
+    111,110,112,111,112,112,113,113,114,114,115,115,115,115,114,115,112,113,110,111,128,123,136,132,145,141,143,147, 92, 95, 95, 92,
+    105,100,117,111,138,136,140,139,141,141,142,142,142,142,142,142,142,142,141,142,140,140,138,139,135,135,134,134,140,136,159,145,
+    135,175, 58, 41,220,191,232,231,206,225,166,183,141,152,127,133,118,122,114,116,111,112,105,107,103,103,103,103,104,104,106,105,
+    107,107,109,108,110,109,111,110,112,111,113,112,114,114,114,114,114,114,112,113,111,111,114,111,123,118,134,129,144,139,149,148,
+    139,147,114,127, 92,102, 86, 87,116,110,127,122,134,131,138,136,140,139,141,140,141,141,142,142,143,142,143,143,142,143,141,142,
+    139,140,137,138,135,135,138,135,148,142,172,164, 41,110, 80, 63,103, 93,203,159,233,225,221,230,176,196,148,160,130,138,120,125,
+    115,117,112,113,107,111,104,105,103,103,104,103,108,107,109,108,110,110,111,111,112,112,113,113,114,113,114,114,114,114,114,114,
+    113,113,111,112,112,111,119,115,130,124,140,135,147,144,146,149,125,138,100,112, 86, 91, 87, 85, 97, 91,110,103,122,116,131,127,
+    137,134,141,139,142,142,143,143,142,142,142,142,141,141,141,141,137,138,135,136,134,135,134,134,133,133,136,134,145,139,164,161,
+     40, 96, 79, 62,102, 92,209,168,234,229,215,231,129,136,120,124,114,117,112,113,111,111,110,110,106,108,105,105,105,105,106,106,
+    107,107,109,108,110,109,111,110,112,111,113,112,113,113,114,114,115,114,115,115,115,115,119,116,128,123,137,133,141,139,143,143,
+    133,140,108,122, 86, 96, 77, 79, 84, 79, 98, 90,113,105,125,119,144,142,145,145,146,146,146,146,145,145,144,144,140,141,139,140,
+    137,138,136,137,136,136,135,135,134,134,133,133,132,132,131,131,130,131,130,130,130,130,132,130,141,136,160,153, 19,108, 65, 44,
+    116, 81,211,175,232,228,206,227,166,184,142,153,128,134,119,123,111,112,111,111,112,111,113,112,112,113,109,110,108,108,108,108,
+    109,109,110,110,111,111,113,112,114,113,115,114,116,116,116,116,116,116,116,116,117,116,122,119,130,126,135,134,134,135,134,134,
+    124,131,102,113, 83, 91, 79, 79, 88, 83,104, 96,121,114,131,127,137,134,140,138,147,147,146,147,145,146,144,145,143,144,142,143,
+    141,142,140,141,139,139,137,138,136,136,135,135,134,134,134,134,163,148, 60,144, 73, 55, 98, 87,190,143,226,216,219,226,184,206,
+    152,166,133,141,122,127,115,118,112,113,110,111,104,104,105,105,106,105,107,106,108,107,109,109,111,110,112,112,113,112,114,114,
+    115,115,116,115,116,116,116,116,116,116,114,115,113,113,115,113,122,118,129,126,134,137,117,126, 98,107, 91, 93, 96, 92,107,101,
+    119,113,129,124,137,133,141,139,144,142,145,144,144,145,143,144,141,142,140,141,139,140,139,139,138,138,138,138,137,138,136,137,
+    135,135,134,134,133,133,132,132,132,132,136,133,148,140,149,164, 44, 65, 82, 65,134, 94,216,187,230,229,205,224,127,133,119,122,
+    114,116,112,113
+  }
+};
+// record current adc data offset
+static u32 ecg_adcBufOff[2];
+#endif
 
 /* private fuction define *****************************************/
 
@@ -221,12 +326,17 @@ static void ecg_init2(void)
     // init param for APP
     ecg_bpm[i] = 0;
     ecg_RsviTimeMs = 0;
+
+#ifdef LiuJH_ECG
+    ecg_adcBufOff[0] = ecg_adcBufOff[1] = 0;
+#endif
   }
 
   // init var for Rn
   ecg_RnDetected = 0;
   ecg_RnEscaped = 0;
   ecg_RnEscapedAll = 0;
+
 }
 
 /*
@@ -238,6 +348,18 @@ static void ecg_init2(void)
 */
 static u8 ecg_convAdcValueToByte(u8 _chIndex, u16 _adcValue, bool _needConv)
 {
+#ifdef LiuJH_ECG
+  u8 byte = 0;
+  // test ONLY
+  if(_needConv){
+    byte = (u8)ecg_adcBuf[_chIndex][ecg_adcBufOff[_chIndex]++];
+
+    // store into buf
+    ecg_buf[_chIndex][ecg_bufBnum[_chIndex]] = byte;
+  }
+  ecg_adcMaxValue = 255;
+  ecg_adcMinValue = 0;
+#else
   i32 value = _adcValue;
   i32 sub1;
   i32 sub2;
@@ -258,6 +380,7 @@ static u8 ecg_convAdcValueToByte(u8 _chIndex, u16 _adcValue, bool _needConv)
     // store into buf
     ecg_buf[_chIndex][ecg_bufBnum[_chIndex]] = byte;
   }
+#endif
 
   // At last: update bufBnum(sync with adc CB)
   (ecg_bufBnum[_chIndex])++;
@@ -277,13 +400,13 @@ static void ecg_filterPeakValue(u16 _adcValue)
 
   // update max and min data
   if(value > ecg_adcMaxValue)
-    ecg_adcMaxValue = value;
+    ecg_adcMaxValue = value + ecg_AdcWeightGain.ecg_AdcMaxValueGain;
   if(value < ecg_adcMinValue)
     ecg_adcMinValue = value;
-  
+
   // record peak value interval 2.5s
   if(value > ecg_adcPeakMaxValue)
-    ecg_adcPeakMaxValue = value;
+    ecg_adcPeakMaxValue = value + ecg_AdcWeightGain.ecg_AdcMaxValueGain;
   if(value < ecg_adcPeakMinValue)
     ecg_adcPeakMinValue = value;
 }
@@ -338,7 +461,7 @@ static void ecg_cbStoreWordToBuf(u8 _chIndex, i32 _iValue)
   // update buf offset if all u16 data have been processed 
   if(ecg_bufBnum[_chIndex] == ecg_bufWnum[_chIndex]){
     ecg_bufWoff[_chIndex] = ecg_bufBnum[_chIndex];
-	ecg_bufBoff[_chIndex] = ecg_bufWoff[_chIndex];
+	  ecg_bufBoff[_chIndex] = ecg_bufWoff[_chIndex];
   }
 
   // if we have no enough space for storing data, return
@@ -353,6 +476,42 @@ static void ecg_cbStoreWordToBuf(u8 _chIndex, i32 _iValue)
   if(!(ecg_bufBnum[_chIndex] ^ (ECG_BUF_SIZE - 1))
     && !(ecg_bufWnum[_chIndex] ^ ECG_BUF_SIZE))
     ecg_bufLastTick[_chIndex] = HAL_GetTick();
+}
+
+/*
+  brief:
+    1. weight = 60000 * (1/(bpm - ECG_BPM_WEIGHT) - 1/(bpm + ECG_BPM_WEIGHT)) / 2;
+    2. So is: weight = 300000 / ((bpm - ECG_BPM_WEIGHT)(bpm + ECG_BPM_WEIGHT));unit is: ms
+    3. We want points, So weight = (weight + 2) >> 2;
+    4. So is: weight = (300000 / ((bpm - ECG_BPM_WEIGHT)(bpm + ECG_BPM_WEIGHT)) + 2) >> 2;
+    5. 60000 is 1minute-->number of ms;
+    6. the MIN move window is (ECG_Rn_MW_HALF_SIZE * 2 - 1) points, so half window is ECG_Rn_MW_HALF_SIZE;
+*/
+static u32 ecg_calRnWinHalfWeight(void)
+{
+  u32 ret = ECG_Rn_MW_HALF_SIZE;
+  u32 m = 300000;
+  u32 b = (ecg_bpm[ECG_RS_INDEX] - ECG_BPM_WEIGHT)*(ecg_bpm[ECG_RS_INDEX] + ECG_BPM_WEIGHT);
+
+  // check bpm and b is valid
+  if(!ecg_bpm[ECG_RS_INDEX] || b == 0) return ret;
+
+#ifndef LiuJH_DEBUG
+  // test only(test it later, we'll use this calculate methlod)
+
+  // calculate time of half weight(unit: ms)
+  b = m / b;
+  // calculate point num of move window
+  b = (b * 1000 + (ecg_RPPiTimeUs >> 1)) / ecg_RPPiTimeUs;
+#else
+  // calculate move window value
+  b = (m / b + 2) >> 2;
+#endif
+  // use it?
+  if(b > ret)
+    ret = b;
+
+  return ret;
 }
 
 
@@ -376,9 +535,12 @@ static void ecg_smRnDetected(void)
 		if escape, we assum the four is Rn(because of set is (min, max]);
 	*/
 
+  // update Rn weight using the newest bpm
+  ecg_RnHalfWeight = ecg_calRnWinHalfWeight();
+
 	// is escape?
 	if(ecg_RnEscaped){
-		ecg_Rdetected[chIndex] = ECG_Rn_MW_HALF_SIZE;
+		ecg_Rdetected[chIndex] = ecg_RnHalfWeight;  // ECG_Rn_MW_HALF_SIZE;
 	}else{
 		/*
 			1. off of R peak point in buf is: (ecg_bufBnum - 2);
@@ -396,8 +558,8 @@ static void ecg_smRnDetected(void)
 #endif
 
 	// get Rn window min and max point num
-	ecg_RnWmin = ecg_RRiPointNum[chIndex] - ECG_Rn_MW_HALF_SIZE;
-	ecg_RnWmax = ecg_RRiPointNum[chIndex] + ECG_Rn_MW_HALF_SIZE;
+	ecg_RnWmin = ecg_RRiPointNum[chIndex] - ecg_RnHalfWeight; // ECG_Rn_MW_HALF_SIZE;
+	ecg_RnWmax = ecg_RRiPointNum[chIndex] + ecg_RnHalfWeight; // ECG_Rn_MW_HALF_SIZE;
 
 #ifdef LiuJH_DEBUG
 	/*
@@ -428,7 +590,7 @@ static void ecg_cbSmRnDetect(u8 _chIndex, i32 _adcValue)
   if(_chIndex) return;
 
   // record enough data?
-  if(ecg_Rdetected[_chIndex] >= ecg_RnWmax){
+  if(ecg_bufWnum[_chIndex] > (ecg_RnHalfWeight << 1)){
   	return;
   }
 
@@ -446,8 +608,8 @@ static void ecg_cbSmRnDetect(u8 _chIndex, i32 _adcValue)
   ecg_cbStoreWordToBuf(ECG_RV_INDEX, (u16)(tick >> 16));
   ecg_cbStoreWordToBuf(ECG_RV_INDEX, (u16)tick);
 
-  // for next loop
-  ecg_Rdetected[_chIndex]++;
+  // for next loop  // update in ecg_smRnDetect
+//  ecg_Rdetected[_chIndex]++;
 }
 
 /*
@@ -467,32 +629,52 @@ static void ecg_smRnDetect(void)
 	u32 offb = 0, tick1, tick2, tick3, tick4;
 	bool found = false;
 
+  // We have data?
+  if(ecg_bufWnum == 0) return;
+
 	// exist new u16 data in Rs buf? got it and convert byte and store into Rs buf
 	if(ecg_bufWnum[chIndex] > ecg_bufBnum[chIndex]){
-	// pull MSB of u16
-	adcValue = ps[ecg_bufBoff[chIndex]++];
-	// pull LSB of u16
-	adcValue = (adcValue << 8) | ps[ecg_bufBoff[chIndex]++];
+  	// pull MSB of u16
+  	adcValue = ps[ecg_bufBoff[chIndex]++];
+  	// pull LSB of u16
+  	adcValue = (adcValue << 8) | ps[ecg_bufBoff[chIndex]++];
 
-	// convert u16 to u8 and store into Rs buf
-	ecg_convAdcValueToByte(chIndex, adcValue, true);
+#ifdef LiuJH_DEBUG
+    // trim peak point value??
+    ecg_filterPeakValue(adcValue);
+#endif
+
+  	// convert u16 to u8 and store into Rs buf
+  	ecg_convAdcValueToByte(chIndex, adcValue, true);
 	}
 
 	// we have enough byte to detect Rn?
-	if(ecg_bufBnum[chIndex] < ECG_RN_DETECT_NUM) return;
+	if(ecg_bufBnum[chIndex] < ECG_RN_DETECT_NUM){
+    // loop waiting next data
+    return;
+  }
+
+  // we have new data for detecting?
+  if(ecg_bufBnum[chIndex] + ecg_RnWmin <= ecg_Rdetected[chIndex]) return;
+
+  // the first detection for this Rn peak point?
+  if(ecg_Rdetected[chIndex] == ecg_RnWmin){
+    // ignore the first two point detected
+    ecg_Rdetected[chIndex] += (ECG_RN_DETECT_NUM - 1);
+  }
 
 	/*
-	NOW:
-	  1. We have ECG_RN_DETECT_NUM data at least: A B C D (E F);
-	  2. R: is more than RnValueV and more than both prev and next data(cur byte);
-	  3. if Rndetected num more than RnWmax, escape;
-	  4. if B == C, B must bigger than D;
+  	NOW:
+  	  1. We have ECG_RN_DETECT_NUM data at least: A B C (D E F);
+  	  2. R: is more than RnValueV and more than both prev and next data(cur byte);
+  	  3. if Rndetected num more than RnWmax, escape;
 	*/
 
 	// get the newest three data for compare
-	aOff = ecg_bufBnum[chIndex] - ECG_RN_DETECT_NUM;
-	bOff = ecg_bufBnum[chIndex] - ECG_RN_DETECT_NUM + 1;
-	cOff = ecg_bufBnum[chIndex] - ECG_RN_DETECT_NUM + 2;
+	cOff = ecg_Rdetected[chIndex] - ecg_RnWmin;
+	bOff = cOff - 1;
+	aOff = bOff - 1;
+  // get these points value
 	aPoint = ps[aOff];
 	bPoint = ps[bOff];
 	cPoint = ps[cOff];
@@ -527,12 +709,30 @@ static void ecg_smRnDetect(void)
 			// clear escaped continued
 			ecg_RnEscaped = 0;
 
-			// Need trim current RRi or NOT???
-			offb = ecg_RnWmin + bOff;
-			if(ecg_RRiPointNum[chIndex] != offb){
-				offb += ecg_RRiPointNum[chIndex];
-				ecg_RRiPointNum[chIndex] = offb >> 1;
-			}
+      // Need update bpm and RRiTimeMs and RRiPointNum?
+      offb = ecg_RnWmin + bOff;
+      if(ecg_RRiPointNum[chIndex] != offb){
+        u32 ms = (offb * ecg_RPPiTimeUs[chIndex]) / 1000;
+//        ecg_RRiTimeMs[chIndex] = (offb * ecg_RPPiTimeUs[chIndex]) / 1000;
+        if(ms){
+          u32 b = (60 * 1000) / ms;
+          if(b > ecg_bpm[chIndex] + ECG_BPM_WEIGHT || b + ECG_BPM_WEIGHT < ecg_bpm[chIndex]){
+            /* bpm changes too much, redo again */
+
+            // adc stable tick
+            ecg_adcStableTick = HAL_GetTick() + ADC_WORKING_STABLE_TIME;
+            // startup again
+            ecg_status = ecg_startup_status;
+            return;
+          }else{
+            // update bpm and others params and loop Rn detection
+            ecg_RRiPointNum[chIndex] = offb;
+            ecg_RRiTimeMs[chIndex] = ms;
+            // update this bpm
+            ecg_bpm[chIndex] = b;
+          }
+        }
+      }
 
 #ifndef LiuJH_DEBUG
 			// toast ble this tick of R peak point detected
@@ -560,21 +760,29 @@ static void ecg_smRnDetect(void)
 	3. escape?
 	*/
 
+  // for next loop detection
+  (ecg_Rdetected[chIndex])++;
+
 	// escape?
-	if(!found && ecg_Rdetected[chIndex] >= ecg_RnWmax && ecg_bufBnum[chIndex] >= ecg_bufWnum[chIndex]){
+	if(!found && ecg_Rdetected[chIndex] >= ecg_RnWmax){
 		// record Rn detected and escaped num
 		ecg_RnDetected++;
 		ecg_RnEscaped++;
 		ecg_RnEscapedAll++;
 
+#ifdef LiuJH_DEBUG
 		// twice continue escaped? restart R1 waiting...
-		if(ecg_RnEscaped >= ECG_ESCAPED_MAX_NUM){
+		if(ecg_RnEscaped > ECG_ESCAPED_MAX_NUM){
 		  // redo R detect, restart up ecg detection
 		  ecg_status = ecg_startup_status;
 		}else{
 		  // for next Rn detect, go into next status for sync buf vars
 		  ecg_status = ecg_RnDetected_status;
 		}
+#else
+    // redo R detect, restart up ecg detection
+    ecg_status = ecg_startup_status;
+#endif
 	}
 }
 
@@ -598,9 +806,11 @@ static void ecg_smRnWaiting2(void)
       3. we only detect Rs-RDET;
   */
 
-	// get Rn window min and max point num
-	ecg_RnWmin = ecg_RRiPointNum[chIndex] - ECG_Rn_MW_HALF_SIZE;
-	ecg_RnWmax = ecg_RRiPointNum[chIndex] + ECG_Rn_MW_HALF_SIZE;
+  ecg_RnHalfWeight = ecg_calRnWinHalfWeight();  // ECG_Rn_MW_HALF_SIZE; // 
+
+  // get Rn window min and max point num
+  ecg_RnWmin = ecg_RRiPointNum[chIndex] - ecg_RnHalfWeight; // ECG_Rn_MW_HALF_SIZE; // 
+  ecg_RnWmax = ecg_RRiPointNum[chIndex] + ecg_RnHalfWeight; // ECG_Rn_MW_HALF_SIZE; //
 
 #ifdef LiuJH_DEBUG
 	/*
@@ -612,7 +822,7 @@ static void ecg_smRnWaiting2(void)
 	ecg_initBuf();
 #endif
 
-#ifndef LiuJH_DEBUG
+#ifdef LiuJH_OVBC
 	// test only
 	pulse_bleConfigPulseOn(true);
 #endif
@@ -666,25 +876,30 @@ static void ecg_smRnWaiting(void)
 
   // Both of Rs and Rv channel finished? go into next status
   if(ecg_Rok[ECG_RS_INDEX] && ecg_Rok[ECG_RV_INDEX]){
-  	u32 n1 = ecg_RRiPointNum[ECG_RS_INDEX], n2 = ecg_RRiPointNum[ECG_RV_INDEX];
+//  	u32 n1 = ecg_RRiPointNum[ECG_RS_INDEX], n2 = ecg_RRiPointNum[ECG_RV_INDEX];
+//    u32 n1 = ecg_bpm[ECG_RS_INDEX], n2 = ecg_bpm[ECG_RV_INDEX];
 
     // clear static var for next detect
     ecg_Rok[ECG_RS_INDEX] = ecg_Rok[ECG_RV_INDEX] = false;
 
     // check bpm of Rs and Rv is equal?
-//    if(ecg_bpm[ECG_RS_INDEX] == ecg_bpm[ECG_RV_INDEX]){
-	// check RRiPointNum
-	if(n1 == n2 || n1 == n2 + 1 || n1 + 1 == n2){
-		/* NOW: we can calculate Rs_Rv delay time(unit: ms) */
-		ecg_calculateRsvi();
+//    if(n1 + ECG_BPM_WEIGHT > n2 || n2 + ECG_BPM_WEIGHT > n1){
+    	// check RRiPointNum
+//    if(n1 == n2 || n1 == n2 + 1 || n1 + 1 == n2){
+  		/* NOW: we can calculate Rs_Rv delay time(unit: ms) */
+  		ecg_calculateRsvi();
 
-		// got into next status for Rn detection
-		ecg_status = ecg_Rnwaiting2_status;
+      // for next redo because of little bpm
+      ecg_detectAgain = false;
+
+  		// got into next status for Rn detection
+  		ecg_status = ecg_Rnwaiting2_status;
+/*
     }else{
-		// restart detect both of Rs and Rv channel
-		ecg_status = ecg_startup_status;
+  		// restart detect both of Rs and Rv channel
+  		ecg_status = ecg_startup_status;
     }
-
+*/
     return;
   }
 
@@ -693,19 +908,6 @@ static void ecg_smRnWaiting(void)
   		1. MUST one channel is NOT OK;
   		2. check Rs channel at first;
   */
-
-#ifndef LiuJH_DEBUG
-	/* need NOT update data */
-
-  // pull u16 adc value from Rs and Rv buf and convert to byte and store into buf again
-  if(ecg_pollAdcValue(&chIndex, &adcValue)){
-    /* ignore channel num, only compare */
-    ecg_filterPeakValue(adcValue);
-
-  // convert u16 to u8 and store into Rs buf
-    ecg_convAdcValueToByte(chIndex, adcValue, true);
-  }
-#endif
 
   // process Rs at first
   if(ecg_Rok[chIndex])
@@ -732,8 +934,20 @@ static void ecg_smRnWaiting(void)
     if(ecg_RRiTimeMs[chIndex])
       ecg_bpm[chIndex] = (60 * 1000) / ecg_RRiTimeMs[chIndex];
 
+#ifndef LiuJH_DEBUG
+    // need redo because of more little bpm value?
+    if(!ecg_detectAgain && ecg_bpm[chIndex] < ECG_BPM_MIN){
+      ecg_detectAgain = true;
+      ecg_status = ecg_startup_status;
+    }else{
+      // update finished flag
+      ecg_Rok[chIndex] = true;
+    }
+#else
     // update finished flag
     ecg_Rok[chIndex] = true;
+#endif
+
   }
 }
 
@@ -751,7 +965,7 @@ static void ecg_smRnWaiting(void)
 static void ecg_smR2Detect(void)
 {
   u8 chIndex = ECG_RS_INDEX;
-  u16 adcValue;
+  u16 adcValue = 0;
   u8 *p, *pn;
   int i;
   int32_t slope;
@@ -826,6 +1040,15 @@ static void ecg_smR2Detect(void)
           ecg_RRiPointNum[chIndex] = ecg_Rdetected[chIndex] - ecg_R1off[chIndex];
 
 #ifdef LiuJH_DEBUG
+          // select max Rvalue of R1 and R2
+          if(*p > ecg_Rvalue[chIndex]){
+            // average R value
+            ecg_Rvalue[chIndex] = (ecg_Rvalue[chIndex] + *p) >> 1;
+          }
+
+          // redo R value V for Rn detection
+          ecg_RvalueV[chIndex] = ecg_Rvalue[chIndex] * ECG_R_VALUE_WEIGHT;
+#else
           // average R value
           ecg_Rvalue[chIndex] = (ecg_Rvalue[chIndex] + *p) >> 1;
           // update R value V
@@ -855,7 +1078,7 @@ static void ecg_smR2Detect(void)
 static void ecg_smR1Detect(void)
 {
   u8 chIndex = ECG_RS_INDEX;
-  u16 adcValue;
+  u16 adcValue = 0;
 
   // pull u16 adc value from Rs and Rv buf and convert to byte and store into buf again
   if(ecg_pollAdcValue(&chIndex, &adcValue)){
@@ -881,7 +1104,7 @@ static void ecg_smR1Detect(void)
 
   // get R1 value V for detect R2(NOTICE: MUST more than 0.83?)
   for(int i = 0; i < ECG_ADC_CH_NUM; i++){
-    ecg_RvalueV[i] = ecg_Rvalue[i] * ECG_R_VALUE_WEIGHT;
+    ecg_RvalueV[i] = ecg_Rvalue[i] * ECG_R_VALUE_WEIGHT1;
   }
 
   /*
@@ -918,8 +1141,8 @@ static void ecg_cbSmR1Waiting(u8 _chIndex, i32 _adcValue)
 static void ecg_smR1Waiting(void)
 {
   u8 chIndex = ECG_RS_INDEX;
-  u16 adcValue;
-  u8 byte;
+  u16 adcValue = 0;
+  u8 byte = 0;
 
   // Both of Rs and Rv channel finished? go into next status
   if(ecg_Rok[ECG_RS_INDEX] && ecg_Rok[ECG_RV_INDEX]){
@@ -954,26 +1177,28 @@ static void ecg_smR1Waiting(void)
 
   // check and record max value(for R1 peak point) after some data(for slope)
   // we want max value at last
-  if(byte >= ecg_Rvalue[chIndex]){
+  if(byte && byte >= ecg_Rvalue[chIndex]){
     // record data value
     ecg_Rvalue[chIndex] = byte;
     // record data offset in buf
     ecg_R1off[chIndex] = ecg_bufBnum[chIndex] - 1;
   }
 
-  // exceed buffer?
-  if(ecg_bufBnum[chIndex] > ECG_BUF_R1_NEED_NUM
-     // check the wave is stable or not(Continuous of max value)
-     && ecg_Rvalue[chIndex] == ECG_MAX_BYTE_VALUE
-     && ecg_buf[chIndex][ecg_bufBnum[chIndex] - 1] == ECG_MAX_BYTE_VALUE){
-
-    // restart collect data
-    ecg_status = ecg_startup_status;
-  }else{
-    // collect data finished? update finished flag in current channel
-    if(ecg_bufBnum[chIndex] >= ECG_BUF_R1_NEED_NUM
+  // collect data finished? update finished flag in current channel
+  // check overflow or OK
+  if(ecg_bufBnum[chIndex] >= ECG_BUF_R1_NEED_NUM){
+    // exceed buffer?
+    // check the wave is stable or not(Continuous of max value)
+    if((ecg_Rvalue[chIndex] == ecg_buf[chIndex][ecg_R1off[chIndex] - 1])
       // for slope data num
-      && ecg_bufBnum[chIndex] > ecg_R1off[chIndex] + ECG_R2_MW_SIZE){
+      || (ecg_bufBnum[chIndex] <= ecg_R1off[chIndex] + ECG_R2_MW_SIZE)
+      // If no signal now, return
+      || (ecg_adcMaxValue <= ecg_adcMinValue + ecg_AdcWeightGain.ecg_AdcMaxValueGain
+      + ecg_AdcWeightGain.ecg_AdcNoSignalWeight)){
+
+      // restart collect data
+      ecg_status = ecg_startup_status;
+    }else{
       // update finished flag
       ecg_Rok[chIndex] = true;
     }
@@ -1162,6 +1387,47 @@ void ecg_adcConvCpltCB(u8 _curCh)
 
   // start ecg real-time state machine process
   ecg_cbStateMachine(_curCh >> 2, adcValue);
+}
+
+/*
+*/
+void ecg_calibrateAdcWeightGain(void)
+{
+  ecg_AdcWeightGain_typeDef *p = &ecg_AdcWeightGain;
+
+  // unvalid? set default
+  if(p->isValid ^ MCU_DATA_STRUCT_VALID_VALUE){
+    p->ecg_AdcNoSignalWeight = ECG_ADC_NO_SIGNAL_WEIGHT;
+    p->ecg_AdcMaxValueGain = ECG_ADC_MAX_VALUE_GAIN;
+
+    p->isValid = MCU_DATA_STRUCT_VALID_VALUE;
+
+    // store this key value into EEPROM
+    ee_readOrWriteKeyValue(ee_kv_baseData, false);
+  }
+}
+
+
+/*
+*/
+ecg_AdcWeightGain_typeDef* ecg_getAdcWeightGain(void)
+{
+  return &ecg_AdcWeightGain;
+}
+
+/*
+*/
+u8 ecg_getStatus(void)
+{
+  return (u8)(ecg_status);
+}
+
+/*
+*/
+void ecg_getAdcPeakValue(u16 *_pmax, u16 *_pmin)
+{
+  *_pmax = (u16)ecg_adcMaxValue;
+  *_pmin = (u16)ecg_adcMinValue;
 }
 
 /*

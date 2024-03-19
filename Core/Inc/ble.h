@@ -23,6 +23,8 @@
 // timeout, we will enter idle status for LPM
 #define BLE_WAITING_TIMEOUT       TIMEOUT_30S
 
+#define BLE_INVALID_BYTE          (0xFF)
+
 
 
 /* type define ----------------------------------------------------------- */
@@ -98,6 +100,7 @@ typedef enum{
 extern void ble_spiTxRxCpltCB(SPI_HandleTypeDef *hspi);
 extern void ble_adcConvCpltCB(void);
 extern void ble_stateMachine(void);
+extern bool ble_Rsl10ChipIsLpm(void);
 extern bool ble_isWorking(void);
 extern void ble_init(void);
 extern bool ble_isBleAdcCh(u8 _curCh);

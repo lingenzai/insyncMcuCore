@@ -26,7 +26,7 @@
 #define WPR_ADCBUF_SIZE                 32
 
 // ultra low battery value
-#define WPR_BATT_LOW_THRESHOLD          3100  // 35% * 12 + 3000 = 3420  // 3100
+#define WPR_BATT_LOW_THRESHOLD          3300  // 35% * 12 + 3000 = 3420  // 3100
 // full charged battery value
 #define WPR_BATT_HIGH_THRESHOLD         4200
 
