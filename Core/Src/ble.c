@@ -1841,6 +1841,7 @@ static void ble_smInited(void)
   if(mcu_rstFlag != mcu_rstFlag_MagnetHall){
     
     ble_status = ble_idle_status;
+    ble_Rsl10IsLpm = true;
     return;
   }
 
@@ -2005,7 +2006,7 @@ void ble_init(void)
   ble_adcMinValue = ble_adcPeakMinValue = ADC_MAX_VALUE;
   ble_pulseShowFlag = false;
 //  ble_pulseOnAction = false;
-  ble_Rsl10IsLpm = true;
+  ble_Rsl10IsLpm = false;
 
 
   ble_status = ble_inited_status;
