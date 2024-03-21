@@ -2005,7 +2005,7 @@ void ble_init(void)
   ble_adcMinValue = ble_adcPeakMinValue = ADC_MAX_VALUE;
   ble_pulseShowFlag = false;
 //  ble_pulseOnAction = false;
-  ble_Rsl10IsLpm = false;
+  ble_Rsl10IsLpm = true;
 
 
   ble_status = ble_inited_status;
