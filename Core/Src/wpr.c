@@ -267,7 +267,7 @@ static void wpr_smCharging(void)
 
     // reset RSL10(RSL10 enter into NoSleepMode, wakeup it to 30 second LPM)
     if(wpr_isFullCharging())
-      ble_resetRSL10();
+      mcu_resetRsl10();
 
     // stop charge
     wpr_status = wpr_stopCharge_status;

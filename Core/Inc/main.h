@@ -36,16 +36,15 @@ extern "C" {
 #include <pulse.h>
 #include <mcu.h>
 #include <ee.h>
-#include <ble.h>
 #include "protocol.h"
 #include "adc.h"
-#include "ecg.h"
 #include "wpr.h"
 #include "flash.h"
 #include "ovbc.h"
 #include "fpulse.h"
 #include "fovbc.h"
-
+#include "RRdetect.h"
+#include <libble.h>
 
 /* USER CODE END Includes */
 

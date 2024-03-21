@@ -690,6 +690,269 @@ void mcu_allStateMachine(void)
 
 
 /*
+*/
+bool mcu_isBleRstMode(void)
+{
+  if(mcu_rstFlag == mcu_rstFlag_MagnetHall)
+    return true;
+
+  return false;
+}
+
+/*
+*/
+bool mcu_fovbcIsWorking(void)
+{
+  return fovbc_isWorking();
+}
+
+/*
+*/
+bool mcu_ovbcIsWorking(void)
+{
+  return ovbc_isWorking();
+}
+
+/*
+*/
+void mcu_adcStartup(void)
+{
+  adc_startup();
+}
+
+/*
+*/
+bool mcu_pulseBlePulsingIsOn(void)
+{
+  return pulse_blePulsingIsOn();
+}
+
+/*
+*/
+u8 mcu_accelGetMotionState(void)
+{
+  return accel_getMotionState();
+}
+
+/*
+*/
+u8 mcu_wprGetBattPercent(void)
+{
+  return wpr_getBattPercent();
+}
+
+/*
+*/
+void mcu_pulseBleConfigPulseOn(bool _isOn)
+{
+  pulse_bleConfigPulseOn(_isOn);
+}
+
+/*
+*/
+void mcu_wprSetChargeSwitch(bool _isOn)
+{
+  wpr_setChargeSwitch(_isOn);
+}
+
+/*
+*/
+bool mcu_wprIsCharging(void)
+{
+  return wpr_isCharging();
+}
+
+/*
+*/
+bool mcu_fpulseIsWorking(void)
+{
+  return fpulse_isWorking();
+}
+
+/*
+*/
+ppulse_config_typeDef mcu_pulseGetConfig(void)
+{
+  return pulse_getConfig();
+}
+
+/*
+  7B_DATE Data Format:
+  Data：17 0B 10 0A 14 0F 04  
+  Note：year+month+day+hour+minute+second+week
+        2023.11.16.10：30：15 Thursday
+*/
+u8 *mcu_bleReqReadDateTime(u8 *_pdata)
+{
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
+
+  if(!_pdata)
+    return _pdata;
+
+  // get current time
+  HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+  // get current date
+  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+
+  // fill in buf
+  *_pdata++ = sDate.Year;
+  *_pdata++ = sDate.Month;
+  *_pdata++ = sDate.Date;
+  *_pdata++ = sTime.Hours;
+  *_pdata++ = sTime.Minutes;
+  *_pdata++ = sTime.Seconds;
+  *_pdata++ = sDate.WeekDay;
+
+  return _pdata;
+}
+
+/*
+*/
+void mcu_bleReqWriteDateTime(u8 *_pdata)
+{
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
+
+  if(!_pdata) return;
+
+  // NOW: got date and time, set mcu date&time
+  // format: year month day hour minute second weekday; total 7 bytes
+  sDate.Year = *_pdata++;
+  sDate.Month = *_pdata++;
+  sDate.Date = *_pdata++;
+  sTime.Hours = *_pdata++;
+  sTime.Minutes = *_pdata++;
+  sTime.Seconds = *_pdata++;
+  sDate.WeekDay = *_pdata++;
+  
+  HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+  HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+}
+
+/*
+*/
+bool mcu_ecgGetRsviAbout(u8 *_pdata)
+{
+  return ecg_getRsviAbout(_pdata);
+}
+
+/*
+*/
+ppulse_unpulsing_period_typeDef mcu_pulseGetUnpulsingPeriod(void)
+{
+  return pulse_getUnpulsingPeriod();
+}
+
+/*
+*/
+void mcu_ecgGetAdcPeakValue(u16 *_pmax, u16 *_pmin)
+{
+  ecg_getAdcPeakValue(_pmax, _pmin);
+}
+
+/*
+*/
+void mcu_fpulseStartupPulsing(u8 _width)
+{
+  fpulse_startupPulsing(_width);
+}
+
+/*
+*/
+ecg_AdcWeightGain_typeDef *mcu_ecgGetAdcWeightGain(void)
+{
+  return ecg_getAdcWeightGain();
+}
+
+/*
+*/
+u8 mcu_ecgGetStatus(void)
+{
+  return ecg_getStatus();
+}
+
+/*
+*/
+u8 mcu_ecgGetBpm(void)
+{
+  return ecg_getBpm();
+}
+
+/*
+*/
+bool mcu_halSpiTransmitReceive(u8 *_ptx, u8 *_prx, u16 _len, u32 _timeout)
+{
+  if(HAL_SPI_TransmitReceive(&hspi2, _ptx, _prx, _len, _timeout) == HAL_OK)
+    return true;
+
+  return false;
+}
+
+/*
+*/
+bool mcu_halSpiTransmit(u8 *_pdata, u16 _len, u32 _timeout)
+{
+  if(HAL_SPI_Transmit(&hspi2, _pdata, _len, _timeout) == HAL_OK)
+    return true;
+
+  return false;
+}
+
+/*
+*/
+void mcu_resetRsl10(void)
+{
+  // use NRESET pin of RSL10 chip to wakeup RSL10 if magnethall exist(Rising edge)
+  HAL_GPIO_WritePin(CCM_PIN18_RSL10_RST_GPIO_Port, CCM_PIN18_RSL10_RST_Pin, GPIO_PIN_RESET);
+  HAL_Delay(5);
+  HAL_GPIO_WritePin(CCM_PIN18_RSL10_RST_GPIO_Port, CCM_PIN18_RSL10_RST_Pin, GPIO_PIN_SET);
+}
+
+/*
+*/
+void mcu_bleCsDeasserted(void)
+{
+  HAL_GPIO_WritePin(CCM_PIN38_BLE_CS_GPIO_Port, CCM_PIN38_BLE_CS_Pin, GPIO_PIN_SET);
+}
+
+/*
+*/
+void mcu_bleCsAsserted(void)
+{
+  HAL_GPIO_WritePin(CCM_PIN38_BLE_CS_GPIO_Port, CCM_PIN38_BLE_CS_Pin, GPIO_PIN_RESET);
+}
+
+/*
+*/
+bool mcu_eeReadOrWriteKeyValue(u8 _key, bool _isRead)
+{
+  return ee_readOrWriteKeyValue((ee_keyvalue_typeDef)_key, _isRead);
+}
+
+/*
+*/
+uint32 mcu_getAdcValue(void)
+{
+  return HAL_ADC_GetValue(&hadc);
+}
+
+/*
+*/
+bool mcu_adcIsWorking(void)
+{
+  return adc_isWorking();
+}
+
+/*
+*/
+void mcu_setEcgPulsingFlag(void)
+{
+  pulse_setEcgPulsingFlag();
+}
+
+
+/*
   brief:
     1. config CCM_PIN45_VOUT_SET_Pin to:
       input mode(6);
