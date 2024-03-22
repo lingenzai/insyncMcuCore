@@ -231,10 +231,16 @@ static void mcu_monitorMegnet(void)
   static u32 ptick;
 
   // Mcu is running for sometimes?
-  if(HAL_GetTick() < MCU_TICK_MIN_FOR_RESET) return;
+  if(HAL_GetTick() < MCU_TICK_MIN_FOR_RESET){
+    exist = false;
+    return;
+  }
 
-  // RSL10 MUST is not LPM mode?
-  if(!ble_Rsl10ChipIsLpm()) return;
+  // RSL10 is not LPM mode?
+  if(!ble_Rsl10ChipIsLpm()){
+    exist = false;
+    return;
+  }
 
   // check magnet for 1 second
   if(HAL_GPIO_ReadPin(CCM_PIN10_WKUP_INTR_GPIO_Port, CCM_PIN10_WKUP_INTR_Pin)){
@@ -244,6 +250,7 @@ static void mcu_monitorMegnet(void)
     if(exist){
       // check period somtimes
       if(HAL_GetTick() >= ptick){
+        exist = false;
         // reset MCU and RSL10
         HAL_NVIC_SystemReset();
       }
@@ -688,6 +695,18 @@ void mcu_allStateMachine(void)
   }
 }
 
+
+/*
+*/
+bool mcu_noSleepTest(void)
+{
+#ifdef LiuJH_DEBUG
+  return false;
+#else
+  // Test only
+  return true;
+#endif
+}
 
 /*
 */

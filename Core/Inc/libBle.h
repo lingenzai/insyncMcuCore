@@ -251,6 +251,7 @@ bool mcu_fovbcIsWorking(void);
     
 */
 bool mcu_isBleRstMode(void);
+bool mcu_noSleepTest(void);
 
 
 #endif /* CORE_LIBBLE_H_ */
