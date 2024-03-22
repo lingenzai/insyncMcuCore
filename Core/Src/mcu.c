@@ -237,7 +237,10 @@ static void mcu_monitorMegnet(void)
   }
 
   // RSL10 is not LPM mode?
-  if(!ble_Rsl10ChipIsLpm()) return;
+  if(!ble_Rsl10ChipIsLpm()){
+    exist = false;
+    return;
+  }
 
   // check magnet for 1 second
   if(HAL_GPIO_ReadPin(CCM_PIN10_WKUP_INTR_GPIO_Port, CCM_PIN10_WKUP_INTR_Pin)){
