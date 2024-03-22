@@ -697,6 +697,9 @@ void mcu_allStateMachine(void)
 
 
 /*
+  because LiuJH_DEBUG defined, so:
+    "ifndef": is NO sleep mode;
+    "ifdef":  is sleep mode;
 */
 bool mcu_noSleepTest(void)
 {
