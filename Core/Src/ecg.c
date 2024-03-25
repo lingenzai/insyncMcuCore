@@ -630,7 +630,7 @@ static void ecg_smRnDetect(void)
 	bool found = false;
 
   // We have data?
-  if(ecg_bufWnum == 0) return;
+  if(ecg_bufWnum[chIndex] == 0) return;
 
 	// exist new u16 data in Rs buf? got it and convert byte and store into Rs buf
 	if(ecg_bufWnum[chIndex] > ecg_bufBnum[chIndex]){

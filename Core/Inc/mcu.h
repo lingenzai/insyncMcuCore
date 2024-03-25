@@ -17,7 +17,7 @@
     c: is current day number
 */
 #define MCU_FIRM_VERSION_LEN          3
-#define MCU_FIRM_VERSION              {00, 03, 21}  // Ver 0.3.12
+#define MCU_FIRM_VERSION              {00, 03, 22}  // Ver 0.3.12
 
 /* If we use wakeup config is DIV16 */
 // 37 * 1000 / 16 = 2368
