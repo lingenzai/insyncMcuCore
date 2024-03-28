@@ -236,7 +236,7 @@ static void mcu_monitorMegnet(void)
     return;
   }
 
-  // RSL10 is not LPM mode?
+  // RSL10 is not LPM mode? return
   if(!ble_Rsl10ChipIsLpm()){
     exist = false;
     return;

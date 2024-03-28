@@ -57,6 +57,7 @@ static bool ee_readData(u32 _addr, u8 *_pdata, u32 _len)
 */
 static bool ee_writeData(u32 _addr, u8 *_pdata, u32 _len)
 {
+#ifdef LiuJH_DEBUG
   // check param
   if(!IS_FLASH_DATA_ADDRESS(_addr) || !_pdata || 
     !IS_FLASH_DATA_ADDRESS(_addr + _len - 1))
@@ -70,6 +71,7 @@ static bool ee_writeData(u32 _addr, u8 *_pdata, u32 _len)
 //    HAL_Delay(5);
   }
   HAL_FLASHEx_DATAEEPROM_Lock();
+#endif
 
   return true;
 }
